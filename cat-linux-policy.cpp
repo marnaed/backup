@@ -28,7 +28,7 @@ using fmt::literals::operator""_format;
 using std::string;
 
 // varaible to assign tasks or cores to CLOS: task / cpu
-const std::string CLOS_ADD = "cpu";
+const std::string CLOS_ADD = "task";
 
 // No Part Policy
 void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
@@ -217,6 +217,36 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
     // PROCESS DATA
     if (current_interval >= firstInterval)
     {
+		// MAD = Median Absolute Value
+ 		// 1. Sort in ascending order vector v
+ 		//std::sort(v.begin(), v.end(), [](const std::tuple<pid_t, double> &left, const std::tuple<pid_t, double> &right) {
+    	//		return std::get<1>(left) < std::get<1>(right);
+ 		//});
+
+ 		// 2. Find the median
+ 		//double Mj = medianV(v);
+
+ 		// 3. Subtract from each value the median
+ 		//auto v_sub = v;
+ 		//for (std::tuple<pid_t, double> &tup : v_sub)
+ 		//{
+     	//	std::get<1>(tup) = fabs (std::get<1>(tup) - Mj);
+ 		//}
+
+		// 4. Sort in ascending order the new set of values
+		//std::sort(v_sub.begin(), v_sub.end(), [](const std::tuple<pid_t, double> &left, const std::tuple<pid_t, double> &right) {
+		//	   return std::get<1>(left) < std::get<1>(right);
+ 		//});
+
+        // 5. Find the median
+ 		//double Mi = medianV(v_sub);
+
+		// 6. Multiply median by b (assume normal distribution)
+		//double MAD = Mi * 1.4826;
+
+		// 7. Calculate limit_outlier
+		//double limit_outlier = Mj + 3*MAD;
+
 		// MEAN AND STD LIMIT OUTLIER CALCULATION
 		//accumulate value
 		macc(meanMPKIL3Total);
@@ -230,7 +260,7 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
 		LOGINF("stdMPKIL3mean = {}"_format(stdmpkiL3Mean));
 
 		//calculate limit outlier
-		double limit_outlier = mpkiL3Mean + 3*stdmpkiL3Mean;
+		double limit_outlier = mpkiL3Mean + 2*stdmpkiL3Mean;
 		LOGINF("limit_outlier = {}"_format(limit_outlier));
 
 
@@ -371,7 +401,7 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
 					else
 					{
                     	get_cat()->add_task(2,pidTask);
-						LOGINF("Task PID {} assigned to CLOS 1"_format(pidTask));
+						LOGINF("Task PID {} assigned to CLOS 2"_format(pidTask));
 					}
                     taskIsInCRCLOS.push_back(std::make_pair(pidTask,2));
                     ipc_CR += ipcTask;
