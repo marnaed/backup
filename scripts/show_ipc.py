@@ -17,6 +17,8 @@ def main():
 
     args = parser.parse_args()
 
+    NUM_APPS = 8;
+
     print(args.workloads)
 
     with open(args.workloads, 'r') as f:
@@ -30,6 +32,8 @@ def main():
     for p in args.policies:
     	columns.append(p)
 
+
+    columns.append('WeightedSpeedup')
     print("columns : ",columns)
     #print("Num workloads: ",len(args.workloads))
     #index = range(0, len(args.workloads))
@@ -57,13 +61,23 @@ def main():
             #create dataframe from raw data
             dfworkload = pd.read_table(wl_name, sep=",")
 
-            df.ix[numW,policy] = dfworkload['interval:mean'].max()
+            df.ix[numW,policy] = dfworkload['ipc:mean'].sum()
+
+
+            #calculate weighted speedup
+            wl_linux = args.inputdir + "/linux/data-agg/" + wl_show_name + "_tot.csv"
+            dflinux = pd.read_table(wl_linux, sep=",")
+            wl_ca = args.inputdir + "/criticalAloneMEAN/data-agg/" + wl_show_name + "_tot.csv"
+            dfca = pd.read_table(wl_ca, sep=",")
+            dfca['ipc:mean'] = dfca['ipc:mean'] / dflinux['ipc:mean']
+            df.ix[numW, 'WeightedSpeedup'] = dfca['ipc:mean'].sum() / NUM_APPS;
+
 
             numW = int(numW) + 1
 
     # save table
     df = df.set_index(['Workload_ID'])
-    outputPathPolicy = outputPath + "/tt-table.csv"
+    outputPathPolicy = outputPath + "/ipc-table.csv"
     print(df)
     df.to_csv(outputPathPolicy, sep=',')
 
