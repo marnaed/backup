@@ -4,8 +4,12 @@
 
 
 
-inputdir=/home/lupones/manager/experiments/$1/criticalAlone/log
-outputdir=/home/lupones/manager/experiments/$1/criticalAlone/states/
+#inputdir=/home/lupones/manager/experiments/$1/criticalAlone/log
+#outputdir=/home/lupones/manager/experiments/$1/criticalAlone/states/
+
+inputdir=/home/lupones/manager/experiments/$1/$2/log
+outputdir=/home/lupones/manager/experiments/$1/$2/states/
+
 
 mkdir $outputdir
 
