@@ -528,7 +528,8 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
                             else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                             {
                                 // no change in IPC
-                                idle = true;
+                                //idle = true;
+								state = 1;
                             }
                             else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             {
@@ -545,6 +546,9 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
                                 // both IPC are worse
                                 state = 1;
                             }
+
+
+
                             break;
 
 						case 20:
@@ -556,7 +560,8 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
                               else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                               {
                                   // no change in IPC
-                                  idle = true;
+                                  //idle = true;
+								  state = 1;
                               }
                               else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                               {
@@ -584,7 +589,8 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
                               else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                               {
                                   // no change in IPC
-                                  idle = true;
+                                  //idle = true;
+								  state = 1;
                               }
                               else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                               {
@@ -612,7 +618,8 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
                             else if( (ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                             {
                                 // no change in IPC
-                                idle = true;
+                                //idle = true;
+								state = 4;
                             }
                             else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             {
@@ -641,7 +648,8 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
                             else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                             {
                                 // IPC equal
-                                idle = true;
+                                //idle = true;
+								state = 4;
                             }
                             else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             {
@@ -669,7 +677,8 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
                             else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                             {
                                 // IPC equal
-                                idle = true;
+                                //idle = true;
+								state = 1;
                             }
                             else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             {
@@ -697,7 +706,8 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
                             else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                             {
                                 // IPC equal
-                                idle = true;
+                                //idle = true;
+								state = 1;
                             }
                             else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             {
