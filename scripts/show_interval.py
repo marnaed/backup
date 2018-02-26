@@ -35,10 +35,10 @@ def main():
     #index = range(0, len(args.workloads))
     l = args.workloads
     print("Num workloads: ",len(args.workloads))
-    index = range(0, 37)
+    index = range(0, 34)
     df = pd.DataFrame(columns=columns, index = index)
     #df['Workload_ID'] = range(1, len(args.workloads)+1)
-    df['Workload_ID'] = range(1, 38)
+    df['Workload_ID'] = range(1, 35)
 
 
     for policy in args.policies:
@@ -61,10 +61,15 @@ def main():
 
             numW = int(numW) + 1
 
+
+    df["%gain"] = ((df["linux"] / df["criticalAlone"]) - 1) * 100
+    #df["%gain"] = ((df["cr_isolated_CLOSes"] / df["13cr9others"]) - 1) * 100
+
     # save table
     df = df.set_index(['Workload_ID'])
     outputPathPolicy = outputPath + "/tt-table.csv"
     print(df)
+    print(df["%gain"].mean())
     df.to_csv(outputPathPolicy, sep=',')
 
 

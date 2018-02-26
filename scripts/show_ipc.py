@@ -39,10 +39,10 @@ def main():
     #index = range(0, len(args.workloads))
     l = args.workloads
     print("Num workloads: ",len(args.workloads))
-    index = range(0, 37)
+    index = range(0, 34)
     df = pd.DataFrame(columns=columns, index = index)
     #df['Workload_ID'] = range(1, len(args.workloads)+1)
-    df['Workload_ID'] = range(1, 38)
+    df['Workload_ID'] = range(1, 35)
 
 
     for policy in args.policies:
@@ -67,7 +67,7 @@ def main():
             #calculate weighted speedup
             wl_linux = args.inputdir + "/linux/data-agg/" + wl_show_name + "_tot.csv"
             dflinux = pd.read_table(wl_linux, sep=",")
-            wl_ca = args.inputdir + "/criticalAloneMEAN/data-agg/" + wl_show_name + "_tot.csv"
+            wl_ca = args.inputdir + "/criticalAlone/data-agg/" + wl_show_name + "_tot.csv"
             dfca = pd.read_table(wl_ca, sep=",")
             dfca['ipc:mean'] = dfca['ipc:mean'] / dflinux['ipc:mean']
             df.ix[numW, 'WeightedSpeedup'] = dfca['ipc:mean'].sum() / NUM_APPS;
