@@ -23,11 +23,15 @@ def main():
     numApps = 8
 
     ## EVENTS USED ##
-    ev0 = "mem_load_uops_retired.l3_hit"
-    ev1 = "mem_load_uops_retired.l3_miss"
-    ev2 = "cycle_activity.stalls_ldm_pending"
-    ev3 = "intel_cqm/llc_occupancy/"
+    #ev0 = "mem_load_uops_retired.l3_hit"
+    #ev1 = "mem_load_uops_retired.l3_miss"
+    #ev2 = "cycle_activity.stalls_ldm_pending"
+    #ev3 = "intel_cqm/llc_occupancy/"
 
+
+    ev0 = "MEM_LOAD_UOPS_RETIRED.L3_HIT"
+    ev1 = "MEM_LOAD_UOPS_RETIRED.L3_MISS"
+    ev3 = "l3_kbytes_occ"
 
     with open(args.workloads, 'r') as f:
         workloads = yaml.load(f)
@@ -58,7 +62,7 @@ def main():
 
                 wl_in_path = args.inputdir + "/" + policy + "/data-agg/" + wl_show_name + "_fin.csv"
 
-                print(wl_in_path)
+                #print(wl_in_path)
 
                 dfaux = pd.read_table(wl_in_path, sep=",")
 
@@ -86,12 +90,13 @@ def main():
 
                 # dataframe for interval table
                 wl_in_path = args.inputdir + "/" + policy + "/data-agg/" + wl_show_name + ".csv"
-                print(wl_in_path)
+                #print(wl_in_path)
 
                 dfWay = pd.read_table(wl_in_path, sep=",")
                 dfWay = dfWay[["interval","app","instructions:mean","instructions:std","ipc:mean","ipc:std",ev1+":mean",ev1+":std",ev3+":mean",ev3+":std"]]
                 #dfWay = dfWay.set_index(['interval'])
                 #groups = dfWay.groupby(level=[0])
+
 
                 # calculate confidence interval of IPC
                 dfWay["ipc:std"] =  Z * ( dfWay["ipc:std"] / SQRT_NUM_REPS_APP )
@@ -134,6 +139,8 @@ def main():
 
                 LLCDATAF = dfLLC
 
+                totalmeanLLC = 0;
+
                 for appName, df in groups:
                     #print(appName)
 
@@ -152,9 +159,11 @@ def main():
                     AuxAPP.index = range(0, numRows)
                     #print(AuxAPP)
                     LLCDATAF[appName] = AuxAPP
+                    totalmeanLLC = totalmeanLLC + AuxAPP.mean()
 
                 # save LLC_occup dataframe
                 #print(LLCDATAF)
+                print(policy + ": " + wl_show_name + " has mean LLC occup: " + str(totalmeanLLC))
                 LLCDATAF = LLCDATAF.set_index(['interval'])
                 outputPathLLC = outputPathWaysWorkload + "/LLC_occup_apps_data_table.csv"
                 LLCDATAF.to_csv(outputPathLLC, sep=',')
@@ -200,11 +209,11 @@ def main():
                 # and add all the values
                 for app, df in groups:
                     words = app.split('_')
-                    if len(words) == 3:
-                        appName = words[1] + "_" + words[2]
-                    else:
-                        appName = words[1]
-                    print(appName)
+                    #if len(words) == 3:
+                    #    appName = words[1] + "_" + words[2]
+                    #else:
+                    appName = words[1]
+                    #print(appName)
 
                     #wl_indiv = "./data-agg/" + appName + "_fin.csv"
                     wl_indiv = "/home/lupones/manager/experiments/individual/20w/data-agg/" + appName + "_fin.csv"
@@ -256,8 +265,8 @@ def main():
 
             tt = outputPathTotal + "/" + wl_show_name + "-totalDataTable.csv"
             dfTotal = dfTotal.set_index(['policy'])
-            print(tt)
-            print(dfTotal)
+            #print(tt)
+            #print(dfTotal)
             dfTotal.to_csv(tt, sep=',')
 
 
