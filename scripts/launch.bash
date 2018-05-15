@@ -26,7 +26,7 @@ eval set -- "$PARSED"
 # now enjoy the options in order and nicely split until we see --
 INI_REP=0
 MAX_REP=3
-CLOG_MIN=war
+CLOG_MIN=inf
 while true; do
     case "$1" in
         --max-rep)
