@@ -110,6 +110,9 @@ void loop(
 	uint32_t interval;
 	int64_t adj_delay_us = time_int_us;
 	auto start_glob = std::chrono::system_clock::now();
+	auto t1 = std::chrono::system_clock::now(); //measure overhead algorithm
+	auto t2 = std::chrono::system_clock::now();
+	uint64_t total_elapsed_us = 0;
 
 	tasklist_t runlist = tasklist_t(tasklist); // Tasks that are not done
 	tasklist_t schedlist = tasklist_t(runlist);
@@ -121,10 +124,19 @@ void loop(
 		LOGINF("Starting interval {} - {} us"_format(interval, chr::duration_cast<chr::microseconds> (start_int - start_glob).count()));
 
 		// Sleep
+		t2 = std::chrono::system_clock::now();
+		if (interval > 0)
+		{
+			uint64_t elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>  (t2 - t1).count();
+			uint32_t prev_interval = interval - 1;
+			LOGINF("[OVERHEAD] Interval {} - {} = {} us"_format(interval,prev_interval,elapsed_us));
+			total_elapsed_us = total_elapsed_us + elapsed_us;
+		}
 		tasks_resume(schedlist);
 		sleep_for(chr::microseconds(adj_delay_us));
 		tasks_pause(schedlist); // Status can change from runnable -> exited
 		LOGDEB("Slept for {} us"_format(adj_delay_us));
+		t1 = std::chrono::system_clock::now();
 
 		// Control elapsed time
 		adjust_time(start_int, start_glob, interval, time_int_us, adj_delay_us);
@@ -169,8 +181,10 @@ void loop(
 
 		// All the tasks have reached their limit -> finish execution
 		if (all_completed)
+		{
+			LOGINF("[TOTAL OVERHEAD] {} us"_format(total_elapsed_us));
 			break;
-
+		}
 		// Remove tasks that are done from runlist
 		runlist.erase(std::remove_if(runlist.begin(), runlist.end(), [](const auto &task_ptr) { return task_ptr->get_status() == Task::Status::done; }), runlist.end());
 		assert(!runlist.empty());
