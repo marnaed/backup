@@ -68,30 +68,177 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
 		ipc = inst / cycl;
         ipcTotal += ipc;
 	}
-	LOGINF("expected IPC total of this interval = {}"_format(expected_IPC));
-    LOGINF("real ipcTotal of this interval = {}"_format(ipcTotal));
+	//LOGINF("expected IPC total of this interval = {}"_format(expected_IPC));
+    //LOGINF("real ipcTotal of this interval = {}"_format(ipcTotal));
 
 	// We assume 4% error
-    double max = expected_IPC * 1.04;
-    double min = expected_IPC * 0.96;
-	LOGINF("min {}, max {}"_format(min,max));
+    //double max = expected_IPC * 1.04;
+    //double min = expected_IPC * 0.96;
+	//LOGINF("min {}, max {}"_format(min,max));
 
-    if(ipcTotal <= max && ipcTotal >= min)
-    {
-        LOGINF("Prediction is GOOD");
-    }
-    else
-    {
-        LOGINF("Prediction is BAD");
-    }
+    //if(ipcTotal <= max && ipcTotal >= min)
+    //{
+    //    LOGINF("Prediction is GOOD");
+    //}
+    //else
+    //{
+    //    LOGINF("Prediction is BAD");
+    //}
 
-    double rel_error = ((double) expected_IPC - (double) ipcTotal) / (double) ipcTotal;
-    LOGINF("Pred rel error {}"_format(rel_error));
+    //double rel_error = ((double) expected_IPC - (double) ipcTotal) / (double) ipcTotal;
+    //LOGINF("Pred rel error {}"_format(rel_error));
 
 	// Assign total IPC of this interval to previos value
-	expected_IPC = ipcTotal;
+	//expected_IPC = ipcTotal;
 }
 
+
+void MissesMemoryCritical::apply(uint64_t current_interval, const tasklist_t &tasklist)
+{
+    // Apply only when the amount of intervals specified has passed
+    if (current_interval % every != 0)
+        return;
+
+	// Apply only when the amount of intervals specified has passed
+      if (current_interval % every != 0)
+          return;
+      // (Core, MPKI-L3) tuple
+      auto v = std::vector<pairD_t>();
+      auto v_ipc = std::vector<pairD_t>();
+
+      auto outlier = std::vector<pair_t>();
+
+      double ipcTotal = 0, mpkiL3Total=0;
+
+      // Number of critical apps found in the interval
+      uint32_t critical_apps = 0;
+      bool change_in_outliers = false;
+
+      LOGINF("CAT Policy name: MissesMemoryCritical");
+
+      // Gather data
+      for (const auto &task_ptr : tasklist)
+      {
+          const Task &task = *task_ptr;
+          std::string taskName = task.name;
+          pid_t taskPID = task.pid;
+          uint32_t cpu = task.cpus.front();
+
+          // stats per interval
+          uint64_t l3_miss = task.stats.last("mem_load_uops_retired.l3_miss");
+          uint64_t inst = task.stats.last("instructions");
+          double ipc = task.stats.last("ipc");
+
+          double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
+
+          LOGINF("Task {} has {} MPKI in L3"_format(taskName,MPKIL3));
+          v.push_back(std::make_pair(taskPID, MPKIL3));
+          v_ipc.push_back(std::make_pair(taskPID, ipc));
+          pid_CPU.push_back(std::make_pair(taskPID,cpu));
+
+          ipcTotal += ipc;
+          mpkiL3Total += MPKIL3;
+      }
+
+	  double meanMPKIL3Total = mpkiL3Total / tasklist.size();
+      LOGINF("Mean MPKIL3Total (/{}) = {}"_format(tasklist.size(), meanMPKIL3Total));
+
+      // PROCESS DATA
+	  // 1. Discern non-critical apps from critical/problematic apps
+      if (current_interval == firstInterval)
+		  samplingPeriod = true;
+
+	  if (current_interval >= firstInterval)
+      {
+		  //accumulate value
+          macc(meanMPKIL3Total);
+
+          //calculate rolling mean
+          mpkiL3Mean = acc::rolling_mean(macc);
+          LOGINF("Rolling mean of MPKI-L3 at interval {} = {}"_format(current_interval,mpkiL3Mean));
+
+          //calculate rolling std and limit of outlier
+          stdmpkiL3Mean = std::sqrt(acc::rolling_variance(macc));
+          LOGINF("stdMPKIL3mean = {}"_format(stdmpkiL3Mean));
+
+          //calculate limit outlier
+          double limit_outlier = mpkiL3Mean + 2*stdmpkiL3Mean;
+          LOGINF("limit_outlier = {}"_format(limit_outlier));
+
+
+          pid_t pidTask;
+          //Check if MPKI-L3 of each APP is 2 stds o more higher than the mean MPKI-L3
+          for (const auto &item : v)
+          {
+              double MPKIL3Task = std::get<1>(item);
+              pidTask = std::get<0>(item);
+              int freqCritical = -1;
+              double fractionCritical = 0;
+
+              if(current_interval > firstInterval)
+              {
+                  //Search for mi tuple and update the value
+                  auto it = frequencyCritical.find(pidTask);
+                  if(it != frequencyCritical.end())
+                  {
+                      freqCritical = it->second;
+                  }
+                  else
+                  {
+                      LOGINF("TASK RESTARTED --> INCLUDE IT AGAIN IN frequencyCritical");
+                      frequencyCritical[pidTask] = 0;
+                      freqCritical = 0;
+                  }
+                  assert(freqCritical>=0);
+                  fractionCritical = freqCritical / (double)(current_interval-firstInterval);
+                  LOGINF("XXX {} / {} = {}"_format(freqCritical,(current_interval-firstInterval),fractionCritical));
+              }
+			  if (MPKIL3Task >= limit_outlier)
+              {
+                  LOGINF("The MPKI-L3 of task with pid {} is an outlier, since {} >= {}"_format(pidTask,MPKIL3Task,limit_outlier));
+                  outlier.push_back(std::make_pair(pidTask,1));
+                  critical_apps = critical_apps + 1;
+
+                  // increment frequency critical
+                  frequencyCritical[pidTask]++;
+              }
+              else if(MPKIL3Task < limit_outlier && fractionCritical>=0.5)
+              {
+                  LOGINF("The MPKI-L3 of task with pid {} is NOT an outlier, since {} < {}"_format(pidTask,MPKIL3Task,limit_outlier));
+                  LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(pidTask,fractionCritical));
+
+                  outlier.push_back(std::make_pair(pidTask,1));
+                  critical_apps = critical_apps + 1;
+              }
+              else
+              {
+                  // it's not a critical app
+                  LOGINF("The MPKI-L3 of task with pid {} is NOT an outlier, since {} < {}"_format(pidTask,MPKIL3Task,limit_outlier));
+                  outlier.push_back(std::make_pair(pidTask,0));
+
+                  // initialize counter if it's the first interval
+                  if(current_interval == firstInterval)
+                  {
+                      frequencyCritical[pidTask] = 0;
+                  }
+              }
+          }//end for
+
+          LOGINF("critical_apps = {}"_format(critical_apps));
+
+		  /* 2. Discern critical and problematic application */
+		  if (samplingPeriod)
+		  {
+
+		  }
+
+
+	  }//end if (current_interval >= firstInterval)
+
+
+
+
+}
 
 // Auxiliar method of Critical Alone policy to reset configuration
 void CriticalAlone::reset_configuration(const tasklist_t &tasklist)
@@ -159,11 +306,6 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
     // Apply only when the amount of intervals specified has passed
     if (current_interval % every != 0)
         return;
-
-    // Define accumulators
-    //acc::accumulator_set <double, acc::stats<acc::tag::rolling_mean>> macc(acc::tag::rolling_window::window_size = 10u);
-    //acc::accumulator_set<double, acc::stats<acc::tag::variance>> accum;
-
     // (Core, MPKI-L3) tuple
 	auto v = std::vector<pairD_t>();
     auto v_ipc = std::vector<pairD_t>();
