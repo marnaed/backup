@@ -118,69 +118,6 @@ class CriticalAlone: public Base
 };
 typedef CriticalAlone CA;
 
-class MissesMemoryCritical: public Base
-{
-    protected:
-    uint64_t every = -1;
-	uint64_t firstInterval = 10;
-	uint64_t gradientWidth = 1;
-
-	double mpkiL3Mean = 0;
-    double stdmpkiL3Mean = 0;
-
-    typedef std::tuple<pid_t, uint64_t> pair_t;
-	typedef std::tuple<pid_t, double> pairD_t;
-
-	std::vector<pair_t> pid_CPU;
-
-    //std::vector<pair_t> taskGradient;
-    //std::vector<pair_t> taskMPKILLC;
-	std::map<pid_t,uint64_t> taskGradient;
-	std::map<pid_t,uint64_t> taskStalls5w;
-	std::map<pid_t,uint64_t> taskStalls15w;
-	std::map<pid_t,uint64_t> taskMPKILLC;
-
-	//number of times a task has been critical
-    std::map<pid_t,uint64_t> frequencyCritical;
-
-	uint64_t maxMask = 0xfffe0;
-	uint64_t maxWays = 15;
-	uint64_t minMask = 0x0001f;
-	uint64_t minWays = 5;
-
-	bool samplingPeriod = false;
-
-
-	// Define accumulators
-    typedef acc::accumulator_set<
-        double, acc::stats<
-            acc::tag::rolling_mean,
-            acc::tag::rolling_variance
-        >
-    >
-    ca_accum_t;
-
-    ca_accum_t macc;
-
-    public:
-    std::shared_ptr<CATLinux> get_cat()
-      {
-          auto ptr = std::dynamic_pointer_cast<CATLinux>(cat);
-          if (ptr)
-              return ptr;
-          else
-              throw_with_trace(std::runtime_error("Linux CAT implementation required"));
-      }
-
-	MissesMemoryCritical(uint64_t _every, uint64_t _firstInterval, uint64_t _gradientWidth) : every(_every), firstInterval(_firstInterval), gradientWidth(_gradientWidth), macc(acc::tag::rolling_window::window_size = 10u) {}
-
-	virtual ~MissesMemoryCritical() = default;
-	virtual void apply(uint64_t, const tasklist_t &) override;
-};
-typedef MissesMemoryCritical MMC;
-
-
-
 
 class ClusteringBase
 {
