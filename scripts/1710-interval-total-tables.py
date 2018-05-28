@@ -28,7 +28,6 @@ def main():
     #ev2 = "cycle_activity.stalls_ldm_pending"
     #ev3 = "intel_cqm/llc_occupancy/"
 
-
     ev0 = "MEM_LOAD_UOPS_RETIRED.L3_HIT"
     ev1 = "MEM_LOAD_UOPS_RETIRED.L3_MISS"
     ev3 = "l3_kbytes_occ"

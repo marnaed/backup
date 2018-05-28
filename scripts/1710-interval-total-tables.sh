@@ -8,4 +8,4 @@ workloads=/home/lupones/manager/experiments/$1/workloads$1.yaml
 inputdir=/home/lupones/manager/experiments/$1
 outputdir=/home/lupones/manager/experiments/$1
 
-sudo python3 ./1710-interval-total-tables.py -w $workloads -id $inputdir -od $outputdir -p linux -p criticalAlone
+sudo python3 ./1710-interval-total-tables.py -w $workloads -id $inputdir -od $outputdir -p linuxLLC
