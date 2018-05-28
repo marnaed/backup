@@ -31,15 +31,10 @@ def main():
     	columns.append(p)
 
     print("columns : ",columns)
-    #print("Num workloads: ",len(args.workloads))
-    #index = range(0, len(args.workloads))
-    l = args.workloads
     print("Num workloads: ",len(args.workloads))
     index = range(0, 34)
     df = pd.DataFrame(columns=columns, index = index)
-    #df['Workload_ID'] = range(1, len(args.workloads)+1)
     df['Workload_ID'] = range(1, 35)
-
 
     for policy in args.policies:
 
@@ -52,9 +47,6 @@ def main():
             df.ix[numW,'Workload'] = wl_show_name
 
             wl_name = args.inputdir + "/" + policy +  "/data-agg/" + wl_show_name + "_tot.csv"
-            #print(wl_name)
-
-            #create dataframe from raw data
             dfworkload = pd.read_table(wl_name, sep=",")
 
             df.ix[numW,policy] = dfworkload['interval:mean'].max()
@@ -62,8 +54,7 @@ def main():
             numW = int(numW) + 1
 
 
-    df["%gain"] = ((df["linux"] / df["criticalAlone"]) - 1) * 100
-    #df["%gain"] = ((df["cr_isolated_CLOSes"] / df["13cr9others"]) - 1) * 100
+    df["%gain"] = ((df["linux"] / df["13cr7others"]) - 1) * 100
 
     # save table
     df = df.set_index(['Workload_ID'])
