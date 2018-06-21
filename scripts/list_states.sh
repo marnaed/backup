@@ -1,11 +1,7 @@
 #!/bin/bash
 
-# $1 = experiment (E.g 170919)
-
-
-
-#inputdir=/home/lupones/manager/experiments/$1/criticalAlone/log
-#outputdir=/home/lupones/manager/experiments/$1/criticalAlone/states/
+# $1 = experiment (e.g. 170919)
+# $2 = policy name (e.g. criticalAware)
 
 inputdir=/home/lupones/manager/experiments/$1/$2/log
 outputdir=/home/lupones/manager/experiments/$1/$2/states/
