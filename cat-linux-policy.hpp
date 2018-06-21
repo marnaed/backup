@@ -39,7 +39,7 @@ class NoPart: public Base
 typedef NoPart NP;
 
 
-class CriticalAlone: public Base
+class CriticalAware: public Base
 {
 
     protected:
@@ -101,9 +101,9 @@ class CriticalAlone: public Base
 
 	//typedef std::tuple<pid_t, uint64_t> pair_t
 
-    CriticalAlone(uint64_t _every, uint64_t _firstInterval) : every(_every), firstInterval(_firstInterval), macc(acc::tag::rolling_window::window_size = 10u) {}
+    CriticalAware(uint64_t _every, uint64_t _firstInterval) : every(_every), firstInterval(_firstInterval), macc(acc::tag::rolling_window::window_size = 10u) {}
 
-    virtual ~CriticalAlone() = default;
+    virtual ~CriticalAware() = default;
 
     //configure CAT
     void reset_configuration(const tasklist_t &);
@@ -116,7 +116,7 @@ class CriticalAlone: public Base
     // metodo apply
     virtual void apply(uint64_t, const tasklist_t &) override;
 };
-typedef CriticalAlone CA;
+typedef CriticalAware CA;
 
 
 class ClusteringBase

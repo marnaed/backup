@@ -69,7 +69,7 @@ std::shared_ptr<cat::policy::Base> config_read_cat_policy(const YAML::Node &conf
 
 	if (kind == "ca")
 	{
-		LOGINF("Using CriticalAlone (ca) CAT policy");
+		LOGINF("Using Critical-Aware (ca) CAT policy");
 
 		// Check that required fields exist
 		for (string field : {"every", "firstInterval"})
@@ -81,7 +81,7 @@ std::shared_ptr<cat::policy::Base> config_read_cat_policy(const YAML::Node &conf
 		uint64_t every = policy["every"].as<uint64_t>();
 		uint64_t firstInterval = policy["firstInterval"].as<uint64_t>();
 
-		return std::make_shared<cat::policy::CriticalAlone>(every, firstInterval);
+		return std::make_shared<cat::policy::CriticalAware>(every, firstInterval);
 	}
 	else if (kind == "np")
 	{

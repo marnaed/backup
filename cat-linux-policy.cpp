@@ -96,7 +96,7 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
 
 
 // Auxiliar method of Critical Alone policy to reset configuration
-void CriticalAlone::reset_configuration(const tasklist_t &tasklist)
+void CriticalAware::reset_configuration(const tasklist_t &tasklist)
 {
     //assign all tasks to CLOS 1
 	if(CLOS_ADD == "task")
@@ -139,7 +139,7 @@ void CriticalAlone::reset_configuration(const tasklist_t &tasklist)
     LOGINF("Reset performed. Original configuration restored");
 }
 
-double CriticalAlone::medianV(std::vector<pairD_t> &vec)
+double CriticalAware::medianV(std::vector<pairD_t> &vec)
 {
 	double med;
     size_t size = vec.size();
@@ -155,7 +155,7 @@ double CriticalAlone::medianV(std::vector<pairD_t> &vec)
 	return med;
 }
 
-void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
+void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 {
     LOGINF("Current_interval = {}"_format(current_interval));
     // Apply only when the amount of intervals specified has passed
@@ -178,7 +178,7 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
     uint32_t critical_apps = 0;
     bool change_in_outliers = false;
 
-    LOGINF("CAT Policy name: Critical Alone");
+    LOGINF("CAT Policy name: Critical-Aware");
 
 	// Gather data
 	for (const auto &task_ptr : tasklist)
@@ -196,7 +196,7 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
 		double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
 
 		//LOGINF("IPC of task {} is {}"_format(taskPID,ipc));
-        LOGINF("Task {} has {} MPKI in L3"_format(taskName,MPKIL3));
+        LOGINF("Task {} has {} MPKI in LLC"_format(taskName,MPKIL3));
         v.push_back(std::make_pair(taskPID, MPKIL3));
         v_ipc.push_back(std::make_pair(taskPID, ipc));
 		pid_CPU.push_back(std::make_pair(taskPID,cpu));
@@ -209,7 +209,7 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
 
     // calculate total MPKIL3 mean of interval
 	double meanMPKIL3Total = mpkiL3Total / tasklist.size();
-	LOGINF("Mean MPKIL3Total (/{}) = {}"_format(tasklist.size(), meanMPKIL3Total));
+	LOGINF("Mean MPKI_LLC_Total (/{}) = {}"_format(tasklist.size(), meanMPKIL3Total));
 
     // PROCESS DATA
     if (current_interval >= firstInterval)
@@ -254,7 +254,7 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
 
 		//calculate rolling std and limit of outlier
 		stdmpkiL3Mean = std::sqrt(acc::rolling_variance(macc));
-		LOGINF("stdMPKIL3mean = {}"_format(stdmpkiL3Mean));
+		LOGINF("stdMPKILLCmean = {}"_format(stdmpkiL3Mean));
 
 		//calculate limit outlier
 		double limit_outlier = mpkiL3Mean + 2*stdmpkiL3Mean;
@@ -286,13 +286,13 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
 				}
 				assert(freqCritical>=0);
 				fractionCritical = freqCritical / (double)(current_interval-firstInterval);
-				LOGINF("XXX {} / {} = {}"_format(freqCritical,(current_interval-firstInterval),fractionCritical));
+				LOGINF("Fraction Critical ({} / {}) = {}"_format(freqCritical,(current_interval-firstInterval),fractionCritical));
 			}
 
 
             if (MPKIL3Task >= limit_outlier)
             {
-                LOGINF("The MPKI-L3 of task with pid {} is an outlier, since {} >= {}"_format(pidTask,MPKIL3Task,limit_outlier));
+                LOGINF("The MPKI_LLC of task with pid {} is an outlier, since {} >= {}"_format(pidTask,MPKIL3Task,limit_outlier));
                 outlier.push_back(std::make_pair(pidTask,1));
                 critical_apps = critical_apps + 1;
 
@@ -301,7 +301,7 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
             }
             else if(MPKIL3Task < limit_outlier && fractionCritical>=0.5)
 			{
-				LOGINF("The MPKI-L3 of task with pid {} is NOT an outlier, since {} < {}"_format(pidTask,MPKIL3Task,limit_outlier));
+				LOGINF("The MPKI_LLC of task with pid {} is NOT an outlier, since {} < {}"_format(pidTask,MPKIL3Task,limit_outlier));
 				LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(pidTask,fractionCritical));
 
 				outlier.push_back(std::make_pair(pidTask,1));
@@ -310,7 +310,7 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
 			else
             {
 				// it's not a critical app
-				LOGINF("The MPKI-L3 of task with pid {} is NOT an outlier, since {} < {}"_format(pidTask,MPKIL3Task,limit_outlier));
+				LOGINF("The MPKI_LLC of task with pid {} is NOT an outlier, since {} < {}"_format(pidTask,MPKIL3Task,limit_outlier));
                 outlier.push_back(std::make_pair(pidTask,0));
 
 				// initialize counter if it's the first interval
@@ -480,8 +480,6 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
                 // if there is no new critical app, modify mask if not done previously
                 if(critical_apps>0 && critical_apps<4)
                 {
-
-                    //LOGINF("Current state = {}"_format(state));
 
                     LOGINF("IPC total = {}"_format(ipcTotal));
                     LOGINF("Expected IPC total = {}"_format(expectedIPCtotal));
@@ -725,7 +723,6 @@ void CriticalAlone::apply(uint64_t current_interval, const tasklist_t &tasklist)
 					}
 
 					//states switch-case
-                    //LOGINF("New state after transition = {}"_format(state));
                     switch ( state )
                     {
                         case 10:
