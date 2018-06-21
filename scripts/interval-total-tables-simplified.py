@@ -48,36 +48,34 @@ def main():
                 outputPathPolicy = outputPath + "/" + policy + "/resultTables"
                 os.makedirs(os.path.abspath(outputPathPolicy), exist_ok=True)
 
-                # dataframe for interval table
+                # Dataframe for interval table
                 wl_in_path = args.inputdir + "/" + policy + "/data-agg/" + wl_show_name + ".csv"
                 print(wl_in_path)
 
                 dfWay = pd.read_table(wl_in_path, sep=",")
                 dfWay = dfWay[["interval","app","instructions:mean","instructions:std","ipc:mean","ipc:std",ev1+":mean",ev1+":std",ev3+":mean",ev3+":std"]]
 
-                # calculate confidence interval of IPC
+                # Calculate confidence interval of IPC
                 dfWay["ipc:std"] =  Z * ( dfWay["ipc:std"] / SQRT_NUM_REPS_APP )
 
-                # calculate l3_kbytes_occ in mbytes
-                dfWay[ev3+":mean"] = dfWay[ev3+":mean"] / 1024
-                dfWay[ev3+":std"] = dfWay[ev3+":std"] / 1024
-                # calculate confidence interval of l3_kbytes_occ
+                # Calculate LLC occupancy
+                dfWay[ev3+":mean"] = (dfWay[ev3+":mean"] / 1024) / 1024
+                dfWay[ev3+":std"] = (dfWay[ev3+":std"] / 1024) / 1024
                 dfWay[ev3+":std"] = Z * ( dfWay[ev3+":std"] / SQRT_NUM_REPS_APP )
 
-                # rename columns
+                # Rename columns
                 dfWay = dfWay.rename(columns={'ipc:mean': 'IPC:mean', 'ipc:std': 'IPC:ci', ev3+':mean': 'l3_Mbytes_occ:mean', ev3+':std': 'l3_Mbytes_occ:ci'})
 
-                # calculate MPKI
+                # Calculate MPKI_LLC
                 relErrIns = (dfWay["instructions:std"] / dfWay["instructions:mean"] )**2
                 relErrEv1 = (dfWay[ev1+":std"] / dfWay[ev1+":mean"] )**2
                 relErr = np.sqrt(relErrIns + relErrEv1)
-
                 dfWay[ev1+":mean"] = dfWay[ev1+":mean"] / (dfWay["instructions:mean"] / 1000)
                 dfWay[ev1+":std"] = dfWay[ev1+":mean"] * relErr
                 dfWay[ev1+":std"] = Z * ( dfWay[ev1+":std"] / SQRT_NUM_REPS_APP )
                 dfWay = dfWay.rename(columns={ev1+':mean': 'MPKIL3:mean', ev1+':std': 'MPKIL3:ci'})
 
-                # GENERATE Interval tables app per workload
+                # Interval tables app per workload
                 dfWay = dfWay[["interval","app","IPC:mean","IPC:ci","l3_Mbytes_occ:mean","l3_Mbytes_occ:ci","MPKIL3:mean","MPKIL3:ci"]]
 
                 dfWayAux = dfWay
@@ -85,13 +83,13 @@ def main():
                 groups = dfWay.groupby(level=[1])
 
                 for appName, df in groups:
-                    #print(appName)
-                    #generate interval_data_table
+                    # Generate interval_data_table for each app
                     outputPathWaysWorkload = outputPathPolicy + "/" + wl_show_name
                     os.makedirs(os.path.abspath(outputPathWaysWorkload), exist_ok=True)
                     outputPathApp = outputPathWaysWorkload + "/" + appName + "-intervalDataTable.csv"
                     df.to_csv(outputPathApp, sep=',')
 
+                # Generate interval data table with agregated values of the apps
                 groups = dfWay.groupby(level=[0])
                 columns = ['interval','IPC:mean','IPC:ci','MPKIL3:mean','MPKIL3:ci']
                 numRows = dfWay['IPC:mean'].count()/numApps
