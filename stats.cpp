@@ -200,6 +200,9 @@ Stats& Stats::accum(const counters_t &counters)
 			// Therefore, in order to know the running and enabled times since the start we need to accumulate them.
 			curr_id_idx.modify(curr_it, [&l](auto &c_){c_.enabled += l.enabled; c_.running += l.running;});
 
+			// Check values of each counter
+			LOGDEB("Counter {} has value {}"_format(c.name,c.value));
+
 			curr_it++;
 			last_it++;
 		}

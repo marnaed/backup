@@ -102,7 +102,7 @@ void loop(
 	for (const auto &task : tasklist)
 	{
 		perf.enable_counters(task->pid);
-		const counters_t counters = perf.read_counters(task->pid)[0];
+		const counters_t counters = perf.read_counters(task->pid,catpol->get_cat())[0];
 		task->stats.accum(counters);
 	}
 
@@ -147,7 +147,7 @@ void loop(
 			Task &task = *task_ptr;
 
 			// Read stats
-			const counters_t counters = perf.read_counters(task.pid)[0];
+			const counters_t counters = perf.read_counters(task.pid, catpol->get_cat())[0];
 			task.stats.accum(counters);
 
 			// Test if the instruction limit has been reached

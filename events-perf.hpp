@@ -8,10 +8,15 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/member.hpp>
+#include "cat-linux.hpp"
+#include "throw-with-trace.hpp"
 
 
 namespace mi = boost::multi_index;
 
+double get_clos_pid(pid_t pid,std::shared_ptr<CAT> cat);
+double get_mask_pid(pid_t pid,std::shared_ptr<CAT> cat);
+double get_num_ways_pid(pid_t pid,std::shared_ptr<CAT> cat);
 
 struct perf_evlist;
 
@@ -88,7 +93,7 @@ class Perf
 	void clean();
 	void clean(pid_t pid);
 	void setup_events(pid_t pid, const std::vector<std::string> &groups);
-	std::vector<counters_t> read_counters(pid_t pid);
+	std::vector<counters_t> read_counters(pid_t pid,std::shared_ptr<CAT> cat);
 	std::vector<std::vector<std::string>> get_names(pid_t pid);
 	void enable_counters(pid_t pid);
 	void disable_counters(pid_t pid);
@@ -98,3 +103,5 @@ class Perf
 
 uint64_t read_max_ujoules_ram();
 uint64_t read_max_ujoules_pkg();
+
+

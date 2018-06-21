@@ -9,13 +9,42 @@ extern "C"
 #include "events-perf.hpp"
 #include "log.hpp"
 #include "throw-with-trace.hpp"
+#include "cat-linux.hpp"
 
 
 using fmt::literals::operator""_format;
 
-
 double read_energy_pkg();
 double read_energy_ram();
+
+
+
+double get_clos_pid(pid_t pid,std::shared_ptr<CAT> cat);
+double get_mask_pid(pid_t pid,std::shared_ptr<CAT> cat);
+double get_num_ways_pid(pid_t pid,std::shared_ptr<CAT> cat);
+
+double get_clos_pid(pid_t pid,std::shared_ptr<CAT> cat)
+{
+	auto ptr = std::dynamic_pointer_cast<CATLinux>(cat);
+	return (double) ptr->get_clos_of_task(pid);
+}
+
+double get_mask_pid(pid_t pid,std::shared_ptr<CAT> cat)
+{
+	auto ptr = std::dynamic_pointer_cast<CATLinux>(cat);
+	uint32_t clos = ptr->get_clos_of_task(pid);
+	LOGINF("get_mask_pid : {}"_format(ptr->get_cbm(clos)));
+	return (double) ptr->get_cbm(clos);
+}
+
+double get_num_ways_pid(pid_t pid,std::shared_ptr<CAT> cat)
+{
+	auto ptr = std::dynamic_pointer_cast<CATLinux>(cat);
+	uint32_t clos = ptr->get_clos_of_task(pid);
+	LOGINF("get_num_ways_pid : {}"_format(ptr->get_cbm(clos)));
+	uint64_t n = __builtin_popcount(ptr->get_cbm(clos));
+    return (double) n;
+}
 
 
 void Perf::init()
@@ -144,7 +173,9 @@ double read_energy_pkg()
 }
 
 
-std::vector<counters_t> Perf::read_counters(pid_t pid)
+
+
+std::vector<counters_t> Perf::read_counters(pid_t pid,std::shared_ptr<CAT> cat)
 {
 	const char *names[max_num_events];
 	double results[max_num_events];
@@ -155,6 +186,10 @@ std::vector<counters_t> Perf::read_counters(pid_t pid)
 
 	const auto epkg = "power/energy-pkg/";
 	const auto eram = "power/energy-ram/";
+	// LUCIA add entries for CLOS and CAT info
+    const auto closnum = "clos_num";
+    const auto numways = "num_ways";
+    const auto maskhex = "clos_mask";
 
 	auto result = std::vector<counters_t>();
 
@@ -175,6 +210,11 @@ std::vector<counters_t> Perf::read_counters(pid_t pid)
 		{
 			counters.insert({i++, epkg, read_energy_pkg(), "j", false, 1, 1});
 			counters.insert({i++, eram, read_energy_ram(), "j", false, 1, 1});
+			// LUCIA put values
+			counters.insert({i++, closnum, get_clos_pid(pid,cat), "", true, 1, 1});
+			counters.insert({i++, maskhex, get_mask_pid(pid,cat), "", true, 1, 1});
+			counters.insert({i++, numways, get_num_ways_pid(pid,cat), "", true, 1, 1});
+
 			first = false;
 		}
 		result.push_back(counters);
@@ -191,6 +231,11 @@ std::vector<std::vector<std::string>> Perf::get_names(pid_t pid)
 	const auto epkg = "power/energy-pkg/";
 	const auto eram = "power/energy-ram/";
 
+	// LUCIA add entries for CLOS and CAT info
+	const auto closnum = "clos_num";
+	const auto numways = "num_ways";
+	const auto maskhex = "clos_mask";
+
 	bool first = true;
 	for (const auto &evlist : pid_events[pid].groups)
 	{
@@ -204,6 +249,10 @@ std::vector<std::vector<std::string>> Perf::get_names(pid_t pid)
 		{
 			v.push_back(epkg);
 			v.push_back(eram);
+			//LUCIA add CLOS fields
+			v.push_back(closnum);
+			v.push_back(numways);
+			v.push_back(maskhex);
 			first = false;
 		}
 		r.push_back(v);
