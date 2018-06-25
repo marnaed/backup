@@ -30,8 +30,6 @@ using fmt::literals::operator""_format;
 // varaible to assign tasks or cores to CLOS: task / cpu
 const std::string CLOS_ADD = "task";
 
-std::string catImpl = "intel";
-
 // No Part Policy
 void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
 {
@@ -335,7 +333,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
                     num_ways_CLOS_2 = 12;
                     maskNonCrCLOS = 0x003ff;
                     num_ways_CLOS_1 = 10;
-                    state = 10;
+                    state = 1;
                     break;
                 case 2:
                     // 2 critical apps = 13cr9others
@@ -343,7 +341,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
                     num_ways_CLOS_2 = 13;
                     maskNonCrCLOS = 0x001ff;
                     num_ways_CLOS_1 = 9;
-                    state = 20;
+                    state = 2;
                     break;
                 case 3:
                     // 3 critical apps = 14cr8others
@@ -351,7 +349,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
                     num_ways_CLOS_2 = 14;
                     maskNonCrCLOS = 0x000ff;
                     num_ways_CLOS_1 = 8;
-                    state = 30;
+                    state = 3;
                     break;
                 default:
                      // no critical apps or more than 3 = 20cr20others
@@ -359,7 +357,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
                      num_ways_CLOS_2 = 20;
                      maskNonCrCLOS = 0xfffff;
                      num_ways_CLOS_1 = 20;
-                     state = 40;
+                     state = 4;
                      break;
             } // close switch
 
@@ -486,338 +484,125 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 
                     double UP_limit_IPC = expectedIPCtotal * 1.04;
                     double LOW_limit_IPC = expectedIPCtotal  * 0.96;
-
                     double NCR_limit_IPC = ipc_NCR_prev*0.96;
                     double CR_limit_IPC = ipc_CR_prev*0.96;
 
-                    if(ipcTotal > UP_limit_IPC)
-                    {
-                        LOGINF("New IPC is BETTER: IPCtotal {} > {}"_format(ipcTotal,UP_limit_IPC));
-                    }
-                    else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
-                    {
-                        LOGINF("WORSE CR IPC: CR {} < {} && NCR {} >= {}"_format(ipc_CR,CR_limit_IPC,ipc_NCR,NCR_limit_IPC));
-                    }
-                    else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
-                    {
-                        LOGINF("WORSE NCR IPC: NCR {} < {} && CR {} >= {}"_format(ipc_NCR,NCR_limit_IPC,ipc_CR,CR_limit_IPC));
-                    }
-                    else if( (ipc_CR < CR_limit_IPC) && (ipc_NCR < NCR_limit_IPC))
-                    {
-                        LOGINF("BOTH IPCs are WORSE: CR {} < {} && NCR {} < {}"_format(ipc_CR,CR_limit_IPC,ipc_NCR,NCR_limit_IPC));
-                    }
-                    else
-                    {
-                        LOGINF("BOTH IPCs are EQUAL (NOT WORSE)");
-                    }
+
+					if(ipcTotal > UP_limit_IPC)
+						LOGINF("New IPC is BETTER: IPCtotal {} > {}"_format(ipcTotal,UP_limit_IPC));
+					else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+						LOGINF("WORSE CR IPC: CR {} < {} && NCR {} >= {}"_format(ipc_CR,CR_limit_IPC,ipc_NCR,NCR_limit_IPC));
+					else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+						LOGINF("WORSE NCR IPC: NCR {} < {} && CR {} >= {}"_format(ipc_NCR,NCR_limit_IPC,ipc_CR,CR_limit_IPC));
+					else if( (ipc_CR < CR_limit_IPC) && (ipc_NCR < NCR_limit_IPC))
+						LOGINF("BOTH IPCs are WORSE: CR {} < {} && NCR {} < {}"_format(ipc_CR,CR_limit_IPC,ipc_NCR,NCR_limit_IPC));
+					else
+						LOGINF("BOTH IPCs are EQUAL (NOT WORSE)");
 
 					//transitions switch-case
-                    switch (state)
-                    {
-                        case 10:
-                            if(ipcTotal > UP_limit_IPC)
-                            {
-                                // IPC better
-                                idle = true;
-                            }
-                            else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            {
-                                // no change in IPC
-                                //idle = true;
-								state = 1;
-                            }
-                            else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
-                            {
-                                // worse NCR IPC
-                                state = 2;
-                            }
-                            else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
-                            {
-                                // worse CR IPC
-                                state = 1;
-                            }
-                            else
-                            {
-                                // both IPC are worse
-                                state = 1;
-                            }
+					switch (state)
+					{
+						case 1: case 2: case 3:
+							if(ipcTotal > UP_limit_IPC)
+								idle = true;
+							else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+								state = 5;
+							else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+								state = 6;
+							else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+								state = 5;
+							else
+								state = 5;
+							break;
 
+						case 5: case 6:
+							if(ipcTotal > UP_limit_IPC)
+								idle = true;
+							else if( (ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+								state = 8;
+							else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+								state = 7;
+							else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC)) //
+								state = 8;
+							else // NCR and CR worse
+								state = 8;
+							break;
 
-
-                            break;
-
-						case 20:
-                              if(ipcTotal > UP_limit_IPC)
-                              {
-                                  // IPC better
-                                  idle = true;
-                              }
-                              else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                              {
-                                  // no change in IPC
-                                  //idle = true;
-								  state = 1;
-                              }
-                              else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
-                              {
-                                  // worse NCR IPC
-                                  state = 2;
-                              }
-                              else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
-                              {
-                                  // worse CR IPC
-                                  state = 1;
-                              }
-                              else
-                              {
-                                  // both IPC are worse
-                                  state = 1;
-                              }
-                              break;
-
-                        case 30:
-                              if(ipcTotal > UP_limit_IPC)
-                              {
-                                  // IPC better
-                                  idle = true;
-                              }
-                              else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                              {
-                                  // no change in IPC
-                                  //idle = true;
-								  state = 1;
-                              }
-                              else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
-                              {
-                                  // worse NCR IPC
-                                  state = 2;
-                              }
-                              else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
-                              {
-                                  // worse CR IPC
-                                  state = 1;
-                              }
-                              else
-                              {
-                                  // both IPC are worse
-                                  state = 1;
-                              }
-                              break;
-
-						case 1:
-                            if(ipcTotal > UP_limit_IPC)
-                            {
-                                // improvement in IPC
-                                idle = true;
-                            }
-                            else if( (ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            {
-                                // no change in IPC
-                                //idle = true;
-								state = 4;
-                            }
-                            else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
-                            {
-                                // worse NCR IPC
-                                state = 3;
-                            }
-                            else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
-                            {
-                                // worse CR IPC
-                                state = 4;
-                            }
-                            else
-                            {
-                                // both IPC are worse
-                                state = 4;
-                            }
-
-                            break;
-
-                        case 2:
-                            if(ipcTotal > UP_limit_IPC)
-                            {
-                                // IPC better
-                                idle = true;
-                            }
-                            else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            {
-                                // IPC equal
-                                //idle = true;
-								state = 4;
-                            }
-                            else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
-                            {
-                                // NCR worse
-                                state = 3;
-                            }
-                            else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
-                            {
-                                // CR worse
-                                state = 4;
-                            }
-                            else
-                            {
-                                // NCR and CR worse
-                                state = 4;
-                            }
-                            break;
-
-						case 3:
-                            if(ipcTotal > UP_limit_IPC)
-                            {
-                                // IPC better
-                                idle = true;
-                            }
-                            else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            {
-                                // IPC equal
-                                //idle = true;
-								state = 1;
-                            }
-                            else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
-                            {
-                                // NCR worse
-                                state = 2;
-                            }
-                            else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
-                            {
-                                // CR worse
-                                state = 1;
-                            }
-                            else
-                            {
-                                // both WORSE
-                                state = 1;
-                            }
-                            break;
-
-                        case 4:
-                            if(ipcTotal > UP_limit_IPC)
-                            {
-                                // IPC better
-                                idle = true;
-                            }
-                            else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            {
-                                // IPC equal
-                                //idle = true;
-								state = 1;
-                            }
-                            else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
-                            {
-                                // NCR worse
-                                state = 2;
-                            }
-                            else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
-                            {
-                                // CR worse
-                                state = 1;
-                            }
-                            else
-                            {
-                                // both WORSE
-                                state = 1;
-                            }
-                            break;
+						case 7: case 8:
+							if(ipcTotal > UP_limit_IPC)
+								idle = true;
+							else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+								state = 5;
+							else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+								state = 6;
+							else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+								state = 5;
+							else // NCR and CR worse
+								state = 5;
+							break;
 					}
 
-					//states switch-case
-                    switch ( state )
-                    {
-                        case 10:
-                            if(idle)
-                            {
-                                LOGINF("New IPC is better or equal-> {} idle intervals"_format(IDLE_INTERVALS));
-                            }
-                            else
-                            {
-                                LOGINF("No action performed");
-                            }
-                            break;
-
-                        case 20:
-                              if(idle)
-                              {
-                                  LOGINF("New IPC is better or equal-> {} idle intervals"_format(IDLE_INTERVALS));
-                              }
-                              else
-                              {
-                                  LOGINF("No action performed");
-                              }
-                              break;
-
-                        case 30:
-                                if(idle)
-                                {
-                                    LOGINF("New IPC is better or equal-> {} idle intervals"_format(IDLE_INTERVALS));
-                                }
-                                else
-                                {
-                                    LOGINF("No action performed");
-                                }
-                                break;
-
-                        case 1:
-                            if(idle)
-                            {
-                                LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
-                            }
+					// State actions switch-case
+					switch ( state )
+					{
+						case 1: case 2: case 3:
+							if(idle)
+								LOGINF("New IPC is better or equal-> {} idle intervals"_format(IDLE_INTERVALS));
 							else
-                            {
-                                LOGINF("NCR-- (Remove one shared way from CLOS with non-critical apps)");
-                                newMaskNonCr = (maskNonCrCLOS >> 1) | 0x00001;
-                                maskNonCrCLOS = newMaskNonCr;
-                                get_cat()->set_cbm(1,maskNonCrCLOS);
-                            }
-                            break;
+								LOGINF("No action performed");
+							break;
 
-                        case 2:
-                            if(idle)
-                            {
-                                LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
-                            }
-                            else
-                            {
-                                LOGINF("CR-- (Remove one shared way from CLOS with critical apps)");
-                                newMaskCr = (maskCrCLOS << 1) & 0xfffff;
-                                maskCrCLOS = newMaskCr;
-                                get_cat()->set_cbm(2,maskCrCLOS);
-                            }
-                            break;
+						case 5:
+							if(idle)
+								LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
+							else
+							{
+								LOGINF("NCR-- (Remove one shared way from CLOS with non-critical apps)");
+								newMaskNonCr = (maskNonCrCLOS >> 1) | 0x00001;
+								maskNonCrCLOS = newMaskNonCr;
+								get_cat()->set_cbm(1,maskNonCrCLOS);
+							}
+							break;
 
-                        case 3:
-                            if(idle)
-                            {
-                                LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
-                            }
-                            else
-                            {
-                                LOGINF("NCR++ (Add one shared way to CLOS with non-critical apps)");
-                                newMaskNonCr = (maskNonCrCLOS << 1) | 0x00001;
-                                maskNonCrCLOS = newMaskNonCr;
-                                get_cat()->set_cbm(1,maskNonCrCLOS);
-                            }
-                            break;
+						case 6:
+							if(idle)
+								LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
+							else
+							{
+								LOGINF("CR-- (Remove one shared way from CLOS with critical apps)");
+								newMaskCr = (maskCrCLOS << 1) & 0xfffff;
+								maskCrCLOS = newMaskCr;
+								get_cat()->set_cbm(2,maskCrCLOS);
+							}
+							break;
 
-                        case 4:
-                            if(idle)
-                            {
-                                LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
-                            }
-                            else
-                            {
-                                LOGINF("CR++ (Add one shared way to CLOS with critical apps)");
-                                newMaskCr = (maskCrCLOS >> 1) | 0x80000;
-                                maskCrCLOS = newMaskCr;
-                                get_cat()->set_cbm(2,maskCrCLOS);
-                            }
-                            break;
+						case 7:
+							if(idle)
+								LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
+							else
+							{
+								LOGINF("NCR++ (Add one shared way to CLOS with non-critical apps)");
+								newMaskNonCr = (maskNonCrCLOS << 1) | 0x00001;
+								maskNonCrCLOS = newMaskNonCr;
+								get_cat()->set_cbm(1,maskNonCrCLOS);
+							}
+							break;
 
+						case 8:
+							if(idle)
+								LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
+							else
+							{
+								LOGINF("CR++ (Add one shared way to CLOS with critical apps)");
+								newMaskCr = (maskCrCLOS >> 1) | 0x80000;
+								maskCrCLOS = newMaskCr;
+								get_cat()->set_cbm(2,maskCrCLOS);
+							}
+							break;
 						default:
-                            break;
+							break;
 
-                    } //SWITCH
+					}
 
                     num_ways_CLOS_1 = __builtin_popcount(get_cat()->get_cbm(1));
                     num_ways_CLOS_2 = __builtin_popcount(get_cat()->get_cbm(2));
