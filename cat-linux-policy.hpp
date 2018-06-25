@@ -21,6 +21,29 @@ namespace policy
 
 namespace acc = boost::accumulators;
 
+
+class LinuxBase : public Base
+{
+      public:
+
+      LinuxBase() = default;
+      virtual ~LinuxBase() = default;
+
+      // Safely cast CAT to LinuxCat
+      std::shared_ptr<CATLinux> get_cat()
+      {
+          auto ptr = std::dynamic_pointer_cast<CATLinux>(cat);
+          if (ptr)
+              return ptr;
+          else
+              throw_with_trace(std::runtime_error("Linux CAT implementation required"));
+      }
+
+      // Derived classes should perform their operations here. This base class does nothing by default.
+      virtual void apply(uint64_t, const tasklist_t &) {}
+};
+
+
 // No partition policy
 class NoPart: public Base
 {
@@ -39,7 +62,7 @@ class NoPart: public Base
 typedef NoPart NP;
 
 
-class CriticalAware: public Base
+class CriticalAware: public LinuxBase
 {
 
     protected:
@@ -90,15 +113,6 @@ class CriticalAware: public Base
 
     public:
 
-	std::shared_ptr<CATLinux> get_cat()
-    {
-		auto ptr = std::dynamic_pointer_cast<CATLinux>(cat);
-        if (ptr)
-        	return ptr;
-    	else
-        	throw_with_trace(std::runtime_error("Linux CAT implementation required"));
-    }
-
 	//typedef std::tuple<pid_t, uint64_t> pair_t
 
     CriticalAware(uint64_t _every, uint64_t _firstInterval) : every(_every), firstInterval(_firstInterval), macc(acc::tag::rolling_window::window_size = 10u) {}
@@ -112,9 +126,8 @@ class CriticalAware: public Base
 	typedef std::tuple<pid_t, double> pairD_t;
 	double medianV(std::vector<pairD_t> &vec);
 
+	virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
 
-    // metodo apply
-    virtual void apply(uint64_t, const tasklist_t &) override;
 };
 typedef CriticalAware CA;
 
@@ -128,7 +141,7 @@ void tasks_to_closes(catlinux_ptr_t cat, const tasklist_t &tasklist, const clust
 std::string cluster_to_tasks(const Cluster &cluster, const tasklist_t &tasklist);
 
 
-class ClusteringBase
+class ClusteringBase: public LinuxBase
 {
 	public:
 
@@ -249,33 +262,6 @@ class Distribute_RelFunc: public DistributingBase
 	virtual ~Distribute_RelFunc() = default;
 
 	virtual cbms_t apply(const tasklist_t &, const clusters_t &clusters) override;
-};
-
-
-//-----------------------------------------------------------------------------
-// Linux CAT Policies
-//-----------------------------------------------------------------------------
-
-
-class LinuxBase : public Base
-{
-	public:
-
-	LinuxBase() = default;
-	virtual ~LinuxBase() = default;
-
-	// Safely cast CAT to LinuxCat
-	std::shared_ptr<CATLinux> get_cat()
-	{
-		auto ptr = std::dynamic_pointer_cast<CATLinux>(cat);
-		if (ptr)
-			return ptr;
-		else
-			throw_with_trace(std::runtime_error("Linux CAT implementation required"));
-	}
-
-	// Derived classes should perform their operations here. This base class does nothing by default.
-	virtual void apply(uint64_t, const tasklist_t &) {}
 };
 
 

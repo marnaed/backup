@@ -103,7 +103,7 @@ void CriticalAware::reset_configuration(const tasklist_t &tasklist)
     	{
 			const Task &task = *task_ptr;
         	pid_t taskPID = task.pid;
-			get_cat()->add_task(1,taskPID);
+			LinuxBase::get_cat()->add_task(1,taskPID);
 		}
 	}
 	else
@@ -111,13 +111,13 @@ void CriticalAware::reset_configuration(const tasklist_t &tasklist)
 		//assign all cores to CLOS 1
 		for (uint32_t c = 0; c < 8; c++)
     	{
-        	get_cat()->add_cpu(1,c);
+        	LinuxBase::get_cat()->add_cpu(1,c);
     	}
 	}
 
     //change masks of CLOS to 0xfffff
-    get_cat()->set_cbm(1,0xfffff);
-    get_cat()->set_cbm(2,0xfffff);
+    LinuxBase::get_cat()->set_cbm(1,0xfffff);
+    LinuxBase::get_cat()->set_cbm(2,0xfffff);
 
     firstTime = 1;
     state = 0;
@@ -362,8 +362,8 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
             } // close switch
 
             num_shared_ways = 2;
-            get_cat()->set_cbm(1,maskNonCrCLOS);
-            get_cat()->set_cbm(2,maskCrCLOS);
+            LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
+            LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 
             LOGINF("COS 2 (CR) now has mask {:#x}"_format(maskCrCLOS));
             LOGINF("COS 1 (non-CR) now has mask {:#x}"_format(maskNonCrCLOS));
@@ -390,12 +390,12 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
                 {
 					if(CLOS_ADD == "cpu")
 					{
-						get_cat()->add_cpu(2,cpuTask);
+						LinuxBase::get_cat()->add_cpu(2,cpuTask);
 						LOGINF("Task in cpu {} assigned to CLOS 2"_format(cpuTask));
 					}
 					else
 					{
-                    	get_cat()->add_task(2,pidTask);
+                    	LinuxBase::get_cat()->add_task(2,pidTask);
 						LOGINF("Task PID {} assigned to CLOS 2"_format(pidTask));
 					}
                     taskIsInCRCLOS.push_back(std::make_pair(pidTask,2));
@@ -405,12 +405,12 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
                 {
 					if(CLOS_ADD == "cpu")
 					{
-						get_cat()->add_cpu(1,cpuTask);
+						LinuxBase::get_cat()->add_cpu(1,cpuTask);
 						LOGINF("Task in cpu {} assigned to CLOS 1"_format(cpuTask));
 					}
 					else
 					{
-						get_cat()->add_task(1,pidTask);
+						LinuxBase::get_cat()->add_task(1,pidTask);
 						LOGINF("Task PID {} assigned to CLOS 1"_format(pidTask));
 	                }
 
@@ -560,7 +560,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 								LOGINF("NCR-- (Remove one shared way from CLOS with non-critical apps)");
 								newMaskNonCr = (maskNonCrCLOS >> 1) | 0x00001;
 								maskNonCrCLOS = newMaskNonCr;
-								get_cat()->set_cbm(1,maskNonCrCLOS);
+								LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							}
 							break;
 
@@ -572,7 +572,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 								LOGINF("CR-- (Remove one shared way from CLOS with critical apps)");
 								newMaskCr = (maskCrCLOS << 1) & 0xfffff;
 								maskCrCLOS = newMaskCr;
-								get_cat()->set_cbm(2,maskCrCLOS);
+								LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 							}
 							break;
 
@@ -584,7 +584,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 								LOGINF("NCR++ (Add one shared way to CLOS with non-critical apps)");
 								newMaskNonCr = (maskNonCrCLOS << 1) | 0x00001;
 								maskNonCrCLOS = newMaskNonCr;
-								get_cat()->set_cbm(1,maskNonCrCLOS);
+								LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							}
 							break;
 
@@ -596,7 +596,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 								LOGINF("CR++ (Add one shared way to CLOS with critical apps)");
 								newMaskCr = (maskCrCLOS >> 1) | 0x80000;
 								maskCrCLOS = newMaskCr;
-								get_cat()->set_cbm(2,maskCrCLOS);
+								LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 							}
 							break;
 						default:
@@ -604,11 +604,11 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 
 					}
 
-                    num_ways_CLOS_1 = __builtin_popcount(get_cat()->get_cbm(1));
-                    num_ways_CLOS_2 = __builtin_popcount(get_cat()->get_cbm(2));
+                    num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
+                    num_ways_CLOS_2 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(2));
 
-					LOGINF("COS 2 (CR)     has mask {:#x} ({} ways)"_format(get_cat()->get_cbm(2),num_ways_CLOS_2));
-                    LOGINF("COS 1 (non-CR) has mask {:#x} ({} ways)"_format(get_cat()->get_cbm(1),num_ways_CLOS_1));
+					LOGINF("COS 2 (CR)     has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
+                    LOGINF("COS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
 
                     num_shared_ways = (num_ways_CLOS_2 + num_ways_CLOS_1) - 20;
                     LOGINF("Number of shared ways: {}"_format(num_shared_ways));
@@ -631,9 +631,6 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 
 
 }//apply
-
-
-
 
 void tasks_to_closes(catlinux_ptr_t cat, const tasklist_t &tasklist, const clusters_t &clusters)
 {
@@ -854,17 +851,6 @@ cbms_t Distribute_RelFunc::apply(const tasklist_t &, const clusters_t &clusters)
 	return cbms;
 }
 
-
-std::shared_ptr<CATLinux> LinuxBase::get_cat()
-{
-	auto ptr =  std::dynamic_pointer_cast<CATLinux>(cat);
-	if (ptr)
-		return ptr;
-	else
-		throw_with_trace(std::runtime_error("Linux CAT implementation required"));
-}
-
-
 void ClusterAndDistribute::show(const tasklist_t &tasklist, const clusters_t &clusters, const cbms_t &ways)
 {
 	assert(clusters.size() == ways.size());
@@ -903,7 +889,7 @@ void ClusterAndDistribute::apply(uint64_t current_interval, const tasklist_t &ta
 	}
 	auto ways = distributing->apply(tasklist, clusters);
 	show(tasklist, clusters, ways);
-	tasks_to_closes(get_cat(), tasklist, clusters);
+	tasks_to_closes(LinuxBase::get_cat(), tasklist, clusters);
 	set_cbms(ways);
 }
 
@@ -916,7 +902,7 @@ void SquareWave::apply(uint64_t current_interval, const tasklist_t &tasklist)
 	// Adjust ways
 	for (uint32_t clos = 0; clos < waves.size(); clos++)
 	{
-		cbm_t cbm = get_cat()->get_cbm(clos);
+		cbm_t cbm = LinuxBase::get_cat()->get_cbm(clos);
 		if (current_interval % waves[clos].interval == 0)
 		{
 			if (waves[clos].is_down)
