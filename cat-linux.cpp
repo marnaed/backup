@@ -5,6 +5,7 @@
 
 #include "cat-linux.hpp"
 #include "common.hpp"
+#include "log.hpp"
 #include "throw-with-trace.hpp"
 
 
@@ -54,15 +55,23 @@ void CATLinux::set_schemata(fs::path clos_dir, uint64_t mask)
 {
 	assert_dir_exists(clos_dir);
 	const std::string schemata = "{}:0={:x}"_format(info.cache, mask);
+	std::ofstream f;
+	try
+	{
+		f = open_ofstream(clos_dir / "schemata");
+	}
+	catch(const std::system_error &e)
+	{
+		throw_with_trace(std::runtime_error("Could not open the file '{}/schemata'"_format(clos_dir.string())));
+	}
 
 	try
 	{
-		std::ofstream f = open_ofstream(clos_dir / "schemata");
 		f << schemata << std::endl;
 	}
 	catch(const std::system_error &e)
 	{
-		throw_with_trace(std::runtime_error("Cannot set schemata of CLOS '{}': {}"_format(clos_dir.string(), strerror(errno))));
+		throw_with_trace(std::runtime_error("Could not set the cmb '0x{:x}' in clos '{}'"_format(mask, clos_dir.string())));
 	}
 }
 
@@ -144,7 +153,8 @@ std::vector<std::string> CATLinux::get_tasks(fs::path clos_dir) const
 {
 	assert_dir_exists(clos_dir);
 	std::ifstream f;
-	f.open((clos_dir / "tasks").c_str());
+	f.open("{}/tasks"_format(clos_dir.string()));
+
 	vector<string> tasks;
 	string task;
 	while (f >> task)
@@ -160,6 +170,10 @@ void CATLinux::add_task(fs::path clos_dir, pid_t pid)
 	{
 		std::ofstream f = open_ofstream(clos_dir / "tasks");
 		f << pid << std::endl;
+		auto children = std::vector<pid_t>();
+		pid_get_children_rec(pid, children);
+		for (const auto &child_pid : children)
+			f << child_pid << std::endl;
 	}
 	catch(const std::system_error &e)
 	{
