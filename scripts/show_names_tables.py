@@ -70,7 +70,10 @@ def main():
 
         df = dictNames[name]
         show_name = name.replace("/", "-")
-        df["%gain"] = (1 - (df["criticalAware"] / df["noPart"])) * 100
+        if name == "ipc":
+            df["%gain"] = ((df["criticalAware"] / df["noPart"]) - 1) * 100
+        else:
+            df["%gain"] = ((df["noPart"] / df["criticalAware"]) - 1) * 100
 
         print(name)
         print(df["%gain"].mean())
