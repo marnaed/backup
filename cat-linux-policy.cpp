@@ -255,7 +255,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 		LOGINF("stdMPKILLCmean = {}"_format(stdmpkiL3Mean));
 
 		//calculate limit outlier
-		double limit_outlier = mpkiL3Mean + 2*stdmpkiL3Mean;
+		double limit_outlier = mpkiL3Mean + 3*stdmpkiL3Mean;
 		LOGINF("limit_outlier = {}"_format(limit_outlier));
 
 
