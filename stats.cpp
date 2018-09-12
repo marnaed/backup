@@ -1,6 +1,8 @@
 #include <functional>
 #include <iomanip>
 #include <sstream>
+#include <iostream>
+#include <iosfwd>
 
 #include <boost/io/ios_state.hpp>
 #include <fmt/format.h>
@@ -269,6 +271,15 @@ std::string Stats::data_to_string_total(const std::string &sep) const
 	return ss.str();
 }
 
+std::string Stats::double2hexstr(double x) const
+{
+   int int_x = (int) x;
+   char buf[255];
+   snprintf (buf,sizeof(buf),"%02x",int_x);
+
+   return "0x" + std::string(buf);
+
+}
 
 std::string Stats::data_to_string_int(const std::string &sep) const
 {
@@ -279,7 +290,15 @@ std::string Stats::data_to_string_int(const std::string &sep) const
 	auto it1 = names.cbegin();
 	while (it1 != names.cend())
 	{
-		ss << acc::last(events.at(*it1));
+		if (*it1 == "clos_mask")
+		{
+			double val_clos = (double) acc::last(events.at(*it1));
+			std::string s_clos = double2hexstr(val_clos);
+			ss << s_clos;
+		}
+		else
+			ss << acc::last(events.at(*it1));
+
 		it1++;
 
 		if (it1 != names.cend())

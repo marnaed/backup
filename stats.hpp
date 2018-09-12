@@ -77,4 +77,5 @@ class Stats
 	std::string header_to_string(const std::string &sep) const;
 	std::string data_to_string_int(const std::string &sep) const;
 	std::string data_to_string_total(const std::string &sep) const;
+	std::string double2hexstr(double x) const;
 };

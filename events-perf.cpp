@@ -33,7 +33,7 @@ double get_mask_pid(pid_t pid,std::shared_ptr<CAT> cat)
 {
 	auto ptr = std::dynamic_pointer_cast<CATLinux>(cat);
 	uint32_t clos = ptr->get_clos_of_task(pid);
-	LOGINF("get_mask_pid : {}"_format(ptr->get_cbm(clos)));
+	//LOGINF("get_mask_pid : {:#x}"_format(ptr->get_cbm(clos)));
 	return (double) ptr->get_cbm(clos);
 }
 
@@ -41,8 +41,8 @@ double get_num_ways_pid(pid_t pid,std::shared_ptr<CAT> cat)
 {
 	auto ptr = std::dynamic_pointer_cast<CATLinux>(cat);
 	uint32_t clos = ptr->get_clos_of_task(pid);
-	LOGINF("get_num_ways_pid : {}"_format(ptr->get_cbm(clos)));
 	uint64_t n = __builtin_popcount(ptr->get_cbm(clos));
+	//LOGINF("get_num_ways_pid : {}"_format(n));
     return (double) n;
 }
 
