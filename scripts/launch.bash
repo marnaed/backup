@@ -100,7 +100,8 @@ for ((REP=${INI_REP};REP<${MAX_REP};REP++)); do
 			echo $WL $((REP+1))/${MAX_REP} 0x${MASK}
 			python3 ${DIR}/makoc.py template.mako --lookup "${DIR}/templates" --defs '{apps: ['$(join_by , ${WL[@]})'], mask: '$MASK'}'> ${CONFIG} || exit 1
 
-			./manager --config ${CONFIG} -o ${OUT} --fin-out ${FIN_OUT} --total-out ${TOT_OUT} --flog-min dbg --clog-min ${CLOG_MIN} --log-file $LOG
+			echo ./manager --config ${CONFIG} -o ${OUT} --fin-out ${FIN_OUT} --total-out ${TOT_OUT} --flog-min inf --clog-min ${CLOG_MIN} --log-file $LOG
+			./manager --config ${CONFIG} -o ${OUT} --fin-out ${FIN_OUT} --total-out ${TOT_OUT} --flog-min inf --clog-min ${CLOG_MIN} --log-file $LOG
 
 		done < $WORKLOADS
 	done
