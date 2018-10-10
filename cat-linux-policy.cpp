@@ -795,13 +795,49 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         pid_CPU.push_back(std::make_pair(taskPID,cpu));
 		active_tasks.push_back(taskPID);
 
-		//insert element in ascending order
-		if(current_interval >= firstInterval)
+
+		auto it = deque_mpkil3.find(taskPID);
+        if(it != deque_mpkil3.end())
+		{
+			std::deque<double> deque_aux = it->second;
+			if(deque_aux.size() == 3)
+			{
+				// 1. Check middle value is not a spike
+				LOGINF("deque_mpkil3 of {}: {}, {}, {}"_format(taskName,deque_aux[0],deque_aux[1],deque_aux[2]));
+				if ((deque_aux[1] >= 2*deque_aux[0]) & (deque_aux[1] >= 2*deque_aux[2]))
+				{
+					if(deque_aux[1] >= 2*deque_aux[2])
+					{
+						LOGINF("SPIKE VALUE!");
+						// middle value is a spike -> remove middle value and insert last value to all_mpkil3
+						all_mpkil3.insert(deque_aux[2]);
+					}
+					LOGINF("Values 1 and 2 are both large");
+					deque_aux.pop_back();
+					deque_aux.pop_back();
+				}
+				else
+				{
+					LOGINF("NOT A SPIKE VALUE! -> ADD LAST ELEMENT");
+					all_mpkil3.insert(deque_aux[2]);
+					deque_aux.pop_back();
+				}
+			}
+			deque_aux.push_front(MPKIL3);
+			deque_mpkil3[taskPID] = deque_aux;
+		}
+        else
+        {
+            deque_mpkil3[taskPID].push_front(MPKIL3);
+        }
+
+
+		/*if(current_interval >= firstInterval)
 			all_mpkil3.insert(MPKIL3);
 		else if(MPKIL3 < 1)
 			all_mpkil3.insert(MPKIL3);
 
-        ipcTotal += ipc;
+        ipcTotal += ipc;*/
 	}
     if (current_interval < firstInterval)
 		return;
