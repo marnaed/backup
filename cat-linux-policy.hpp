@@ -10,7 +10,7 @@
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/rolling_window.hpp>
 #include <boost/accumulators/statistics/rolling_variance.hpp>
-
+#include <set>
 
 namespace cat
 {
@@ -130,6 +130,79 @@ class CriticalAware: public LinuxBase
 
 };
 typedef CriticalAware CA;
+
+
+class CriticalAwareV2: public LinuxBase
+{
+	protected:
+    uint64_t every = -1;
+    uint64_t firstInterval = 1;
+
+    //Masks of CLOS
+    uint64_t maskCrCLOS = 0xfffff;
+    uint64_t num_ways_CLOS_2 = 20;
+    uint64_t maskNonCrCLOS = 0xfffff;
+    uint64_t num_ways_CLOS_1 = 20;
+	uint64_t num_shared_ways = 0;
+	uint64_t prev_critical_apps = 0;
+
+    //Control of the changes made in the masks
+    uint64_t state = 0;
+    double expectedIPCtotal = 0;
+    double ipc_CR_prev = 0;
+    double ipc_NCR_prev = 0;
+
+    double mpkiL3Mean = 0;
+    double stdmpkiL3Mean = 0;
+
+	//Flags
+    bool firstTime = true;
+	bool idle = false;
+
+    uint64_t IDLE_INTERVALS = 5;
+    uint64_t idle_count = IDLE_INTERVALS;
+
+    // Define accumulators
+    typedef acc::accumulator_set<
+        double, acc::stats<
+            acc::tag::rolling_mean,
+            acc::tag::rolling_variance
+        >
+    >
+    ca_accum_t;
+    ca_accum_t macc;
+
+    //vector to store if task is assigned to critical CLOS
+    typedef std::tuple<pid_t, uint64_t> pair_t;
+	typedef std::tuple<pid_t, double> pairD_t;
+	std::set<double> all_mpkil3;
+    std::vector<pair_t> taskIsInCRCLOS;
+    std::vector<pair_t> pid_CPU;
+
+	// number of times a task has been critical
+    std::map<pid_t,uint64_t> frequencyCritical;
+
+    // dictionary with CLOSes and corresponding masks
+    std::map<uint64_t, uint64_t> clos_mask = {
+        { 3, 0x00003 },
+        { 5, 0x0000c }
+    };
+
+    uint64_t CLOS_key = 3;
+
+    public:
+
+	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval) : every(_every), firstInterval(_firstInterval), macc(acc::tag::rolling_window::window_size = 10u) {}
+
+    virtual ~CriticalAwareV2() = default;
+
+    //configure CAT
+    void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
+
+    virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
+
+};
+typedef CriticalAwareV2 CAV2;
 
 
 //-----------------------------------------------------------------------------
