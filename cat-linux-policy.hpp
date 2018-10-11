@@ -179,9 +179,11 @@ class CriticalAwareV2: public LinuxBase
 
     uint64_t CLOS_key = 3;
 
-	// variables to see if MPKI-L3 is a spike value
-	//std::deque <double> deque_mpkil3;
+	// dictionary holding deque with 3 last MPKIL3 values for each task
 	std::map<pid_t, std::deque<double>> deque_mpkil3;
+
+	// number of times consecutive critical_apps = 0 detected
+	uint64_t num_no_critical = 0;
 
     public:
 

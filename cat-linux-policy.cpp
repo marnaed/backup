@@ -869,10 +869,14 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     LOGINF("limit_outlier = {}"_format(limit_outlier));
 
     pid_t pidTask;
+	double max_mpkil3 = 0;
     // Check if MPKI-L3 of each APP is 2 stds o more higher than the mean MPKI-L3
     for (const auto &item : v_mpkil3)
     {
     	double MPKIL3Task = std::get<1>(item);
+		if(MPKIL3Task > max_mpkil3)
+			max_mpkil3 = MPKIL3Task;
+
         pidTask = std::get<0>(item);
         int freqCritical = -1;
         double fractionCritical = 0;
@@ -897,9 +901,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         {
             LOGINF("The MPKI_LLC of task with pid {} is an outlier, since {} >= {}"_format(pidTask,MPKIL3Task,limit_outlier));
             outlier.push_back(std::make_pair(pidTask,1));
-			LOGINF("RRR Size before erase:{}"_format(all_mpkil3.size()));
-			all_mpkil3.erase(MPKIL3Task); //remove outlier to avoid data normalness
-			LOGINF("RRR Size after erase:{}"_format(all_mpkil3.size()));
+			//LOGINF("RRR Size before erase:{}"_format(all_mpkil3.size()));
+			//all_mpkil3.erase(MPKIL3Task); //remove outlier to avoid data normalness
+			//LOGINF("RRR Size after erase:{}"_format(all_mpkil3.size()));
             critical_apps = critical_apps + 1;
 
 			// increment frequency critical
@@ -928,7 +932,25 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     }
     LOGINF("critical_apps = {}"_format(critical_apps));
 
-    //check CLOS are configured to the correct mask
+	// keep count of consecutive intervals no critical apps are detected
+	if (critical_apps == 0)
+		num_no_critical +=1;
+	else
+		num_no_critical = 0;
+
+	// if more than 5 consecutive intervals were no critical apps are detected
+	if(num_no_critical >=5)
+	{
+		// then remove from all_mpkil3 the values greater than max_mpkil3
+		LOGINF("Number of intervals with no critical apps >= 5!! ");
+		LOGINF("RRR Size before erase:{}"_format(all_mpkil3.size()));
+    	std::set<double>::iterator itN = all_mpkil3.upper_bound(max_mpkil3);
+		all_mpkil3.erase(itN,all_mpkil3.end());
+		LOGINF("RRR Size after erase:{}"_format(all_mpkil3.size()));
+
+	}
+
+    // check CLOS are configured to the correct mask
     if (firstTime)
     {
     	// set ways of CLOS 1 and 2
