@@ -1175,25 +1175,25 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					{
 						case 5:
 							LOGINF("NCR-- (Remove one shared way from CLOS with non-critical apps)");
-							newMaskNonCr = (maskNonCrCLOS >> 1) | 0x00010;
+							newMaskNonCr = (maskNonCrCLOS >> 1) & maskNonCrCLOS;
 							maskNonCrCLOS = newMaskNonCr;
 							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							break;
 						case 6:
 							LOGINF("CR-- (Remove one shared way from CLOS with critical apps)");
-							newMaskCr = (maskCrCLOS << 1) & 0xfffff;
+							newMaskCr = (maskCrCLOS << 1) & maskCrCLOS;
 							maskCrCLOS = newMaskCr;
 							LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 							break;
 						case 7:
 							LOGINF("NCR++ (Add one shared way to CLOS with non-critical apps)");
-							newMaskNonCr = (maskNonCrCLOS << 1) | 0x00010;
+							newMaskNonCr = (maskNonCrCLOS << 1) | maskNonCrCLOS;
 							maskNonCrCLOS = newMaskNonCr;
 							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							break;
 						case 8:
 							LOGINF("CR++ (Add one shared way to CLOS with critical apps)");
-							newMaskCr = (maskCrCLOS >> 1) | 0x80000;
+							newMaskCr = (maskCrCLOS >> 1) | maskCrCLOS;
 							maskCrCLOS = newMaskCr;
 							LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 							break;
