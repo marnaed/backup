@@ -789,7 +789,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
 
         LOGINF("Task {}: MPKI_L3 = {}, L3_occup {}"_format(taskName,MPKIL3,l3_occup));
-        v_mpkil3.push_back(std::make_pair(taskPID, MPKIL3));
+        //v_mpkil3.push_back(std::make_pair(taskPID, MPKIL3));
         v_ipc.push_back(std::make_pair(taskPID, ipc));
         v_l3_occup.push_back(std::make_pair(taskPID, l3_occup));
         pid_CPU.push_back(std::make_pair(taskPID,cpu));
@@ -800,30 +800,46 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         if(it != deque_mpkil3.end())
 		{
 			std::deque<double> deque_aux = it->second;
+			deque_aux.push_front(MPKIL3);
+
 			if(deque_aux.size() == 3)
 			{
 				// 1. Check middle value is not a spike
 				LOGINF("deque_mpkil3 of {}: {}, {}, {}"_format(taskName,deque_aux[0],deque_aux[1],deque_aux[2]));
 				if ((deque_aux[1] >= 2*deque_aux[0]) & (deque_aux[1] >= 2*deque_aux[2]))
 				{
-					if(deque_aux[1] >= 2*deque_aux[2])
-					{
-						LOGINF("SPIKE VALUE!");
-						// middle value is a spike -> remove middle value and insert last value to all_mpkil3
-						all_mpkil3.insert(deque_aux[2]);
-					}
-					LOGINF("Values 1 and 2 are both large");
-					deque_aux.pop_back();
-					deque_aux.pop_back();
+					// middle value is a spike -> remove middle value and insert last value to all_mpkil3
+					LOGINF("SPIKE VALUE!");
+					v_mpkil3.push_back(std::make_pair(taskPID,deque_aux[2]));
+
+					// add value to mpkil3_prev vector
+					auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple) == taskPID;});
+					if(it_pm == v_mpkil3_prev.end())
+						v_mpkil3_prev.push_back(std::make_pair(taskPID,deque_aux[2]));
+					else
+						std::get<1>(*it_pm) = deque_aux[2];
+
+					all_mpkil3.insert(deque_aux[2]);
+					deque_aux.pop_back(); //remove value 2
+					deque_aux.pop_back(); //remove value 1
 				}
 				else
 				{
-					LOGINF("NOT A SPIKE VALUE! -> ADD LAST ELEMENT");
+					LOGINF("NOT A SPIKE VALUE!");
+					double aux = (deque_aux[1] + deque_aux[2]) / 2;
+					v_mpkil3.push_back(std::make_pair(taskPID,aux));
 					all_mpkil3.insert(deque_aux[2]);
-					deque_aux.pop_back();
+					deque_aux.pop_back(); //remove value 2
 				}
+
 			}
-			deque_aux.push_front(MPKIL3);
+			else if(current_interval >= firstInterval)
+			{
+				// get value MPKI-L3 prev if no new values available
+				auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple) == taskPID;});
+              	if(it_pm != v_mpkil3_prev.end())
+					v_mpkil3.push_back(std::make_pair(taskPID,std::get<1>(*it_pm)));
+			}
 			deque_mpkil3[taskPID] = deque_aux;
 		}
         else
@@ -1030,8 +1046,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			pidTask = std::get<0>(item);
             uint32_t outlierValue = std::get<1>(item);
 
-			auto it = std::find_if(v_ipc.begin(), v_ipc.end(),[&pidTask](const  auto& tuple) {return std::get<0>(tuple) == pidTask;});
-			double ipcTask = std::get<1>(*it);
+			auto itW = std::find_if(v_ipc.begin(), v_ipc.end(),[&pidTask](const  auto& tuple) {return std::get<0>(tuple) == pidTask;});
+			double ipcTask = std::get<1>(*itW);
 
 			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple)  == pidTask;});
             uint64_t CLOSvalue = std::get<1>(*it2);
@@ -1079,8 +1095,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					if(outlierValue == 0 && CLOS_key <= 5)
                     {
                         // Find LLC Occupancy
-                        auto it = std::find_if(v_l3_occup.begin(), v_l3_occup.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
-                        double l3_occup_task = std::get<1>(*it);
+                        auto itT = std::find_if(v_l3_occup.begin(), v_l3_occup.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
+                        double l3_occup_task = std::get<1>(*itT);
 
                         auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
                         uint64_t CLOSvalue = std::get<1>(*it2);
@@ -1098,6 +1114,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 							//Remove 2 ways to CLOS with non-critical apps.
 							uint64_t new_mask_ncr = (maskNonCrCLOS << 2) & maskNonCrCLOS;
+							LOGINF("New mask of ncr clos: {:x}"_format(new_mask_ncr));
 							maskNonCrCLOS = new_mask_ncr;
 							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
