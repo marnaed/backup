@@ -167,6 +167,7 @@ class CriticalAwareV2: public LinuxBase
 	std::set<double> all_mpkil3;
     std::vector<pair_t> taskIsInCRCLOS;
     std::vector<pair_t> pid_CPU;
+	std::vector<pairD_t> v_mpkil3_prev;
 
 	// number of times a task has been critical
     std::map<pid_t,uint64_t> frequencyCritical;
@@ -174,7 +175,7 @@ class CriticalAwareV2: public LinuxBase
     // dictionary with CLOSes and corresponding masks
     std::map<uint64_t, uint64_t> clos_mask = {
         { 3, 0x00003 },
-        { 5, 0x0000c }
+        { 5, 0x0000C }
     };
 
     uint64_t CLOS_key = 3;
