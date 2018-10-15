@@ -621,6 +621,7 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 	CLOS_key = 3;
 	idle = false;
 	idle_count = IDLE_INTERVALS;
+	bool CLOS_additional_ncr = false;
 
 	LOGINF("YYY From {} ways to {} ways"_format(num_critical_old,num_critical_new));
 
@@ -680,9 +681,10 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 		{
 			// check is non-critical app is in CLOS 3 or 5
 			uint64_t clos_value = std::get<1>(item);
-			if(clos_value == 5 || clos_value == 3)
+			if((clos_value == 3) | (clos_value == 5))
 			{
 				LOGINF("CLOS {}"_format(clos_value));
+				CLOS_additional_ncr = true;
 				LinuxBase::get_cat()->add_task(1,taskPID);
 				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple)  == taskPID;});
 				it2 = taskIsInCRCLOS.erase(it2);
@@ -700,7 +702,7 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 		//LOGINF("YYY Task {} is assigned to CLOS {}"_format(pidTask,CLOSvalue));
 	}*/
 
-	if(num_critical_old != num_critical_new)
+	if((num_critical_old != num_critical_new) | (CLOS_additional_ncr))
 	{
 		switch(num_critical_new)
 		{
