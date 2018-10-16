@@ -1111,28 +1111,22 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						}
 						else if(critical_apps == 2)
 						{
-							if(n_apps == 2 && (l3_occup_task <= 0.85*num_ways_CLOS_2))
+							total_space += l3_occup_task;
+							n_apps += 1;
+							if(n_apps == 2 && (total_space <= 0.85*num_ways_CLOS_2))
 							{
 								LOGINF("ONLY occupied {} when there is {} available --> RETURN"_format(total_space,num_ways_CLOS_2));
 								return;
 							}
-							else if(n_apps < 2)
-							{
-								total_space += l3_occup_task;
-								n_apps += 1;
-							}
 						}
 						else if(critical_apps == 3)
 						{
-							if(n_apps == 3 && (l3_occup_task <= 0.85*num_ways_CLOS_2))
+							total_space += l3_occup_task;
+                            n_apps += 1;
+                            if(n_apps == 3 && (total_space <= 0.85*num_ways_CLOS_2))
                             {
-                            	LOGINF("ONLY occupied {} when there is {} available --> RETURN"_format(total_space,num_ways_CLOS_2));
+                                LOGINF("ONLY occupied {} when there is {} available --> RETURN"_format(total_space,num_ways_CLOS_2));
                                 return;
-                            }
-                            else if(n_apps < 3)
-                            {
-                            	total_space += l3_occup_task;
-                                n_apps += 1;
                             }
 						}
 					}
@@ -1142,7 +1136,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                         auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
                         uint64_t CLOSvalue = std::get<1>(*it2);
 						assert(CLOSvalue>=1 && CLOSvalue<=5);
-						LOGINF("YYY Task {} in CLOS {} has llc_occup {}"_format(pidTask,CLOSvalue,l3_occup_task));
+						//LOGINF("YYY Task {} in CLOS {} has llc_occup {}"_format(pidTask,CLOSvalue,l3_occup_task));
 
 						if(l3_occup_task > 3 && CLOSvalue == 1)
 						{
