@@ -790,7 +790,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
         double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
 
-        LOGINF("Task {}: MPKI_L3 = {}, L3_occup {}"_format(taskName,MPKIL3,l3_occup));
+        LOGINF("Task {}: IPC = {}, MPKI_L3 = {}, L3_occup {}"_format(taskName,ipc,MPKIL3,l3_occup));
         //v_mpkil3.push_back(std::make_pair(taskPID, MPKIL3));
         v_ipc.push_back(std::make_pair(taskPID, ipc));
         v_l3_occup.push_back(std::make_pair(taskPID, l3_occup));
@@ -807,11 +807,11 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			if(deque_aux.size() == 3)
 			{
 				// 1. Check middle value is not a spike
-				LOGINF("deque_mpkil3 of {}: {}, {}, {}"_format(taskName,deque_aux[0],deque_aux[1],deque_aux[2]));
+				//LOGINF("deque_mpkil3 of {}: {}, {}, {}"_format(taskName,deque_aux[0],deque_aux[1],deque_aux[2]));
 				if ((deque_aux[1] >= 2*deque_aux[0]) & (deque_aux[1] >= 2*deque_aux[2]))
 				{
 					// middle value is a spike -> remove middle value and insert last value to all_mpkil3
-					LOGINF("SPIKE VALUE!");
+					//LOGINF("SPIKE VALUE!");
 					v_mpkil3.push_back(std::make_pair(taskPID,deque_aux[2]));
 
 					// add value to mpkil3_prev vector
@@ -827,7 +827,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				else
 				{
-					LOGINF("NOT A SPIKE VALUE!");
+					//LOGINF("NOT A SPIKE VALUE!");
 					double aux = (deque_aux[1] + deque_aux[2]) / 2;
 					v_mpkil3.push_back(std::make_pair(taskPID,aux));
 					all_mpkil3.insert(deque_aux[2]);
@@ -1088,23 +1088,60 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			// if there is no new critical app, modify mask if not done previously
             if(critical_apps>0 && critical_apps<4)
             {
+				uint64_t n_apps = 0;
+				double total_space = 0;
                 // Check first if there is a non-critical application occupying more space than it should
                 for (const auto &item : outlier)
                 {
                     pidTask = std::get<0>(item);
                     uint32_t outlierValue = std::get<1>(item);
 
-					if(outlierValue == 0 && CLOS_key <= 5)
-                    {
-                        // Find LLC Occupancy
-                        auto itT = std::find_if(v_l3_occup.begin(), v_l3_occup.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
-                        double l3_occup_task = std::get<1>(*itT);
+					// Find LLC Occupancy
+					auto itT = std::find_if(v_l3_occup.begin(), v_l3_occup.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
+					double l3_occup_task = std::get<1>(*itT);
 
+					if(outlierValue)
+					{
+						// check if occupancy is close to ways assigned
+						if((critical_apps == 1) && (l3_occup_task <= 0.85*num_ways_CLOS_2))
+						{
+							LOGINF("Task {} ONLY occupies {} when it has {} available --> RETURN"_format(pidTask,l3_occup_task,num_ways_CLOS_2));
+							return;
+						}
+						else if(critical_apps == 2)
+						{
+							if(n_apps == 2 && (l3_occup_task <= 0.85*num_ways_CLOS_2))
+							{
+								LOGINF("ONLY occupied {} when there is {} available --> RETURN"_format(total_space,num_ways_CLOS_2));
+								return;
+							}
+							else if(n_apps < 2)
+							{
+								total_space += l3_occup_task;
+								n_apps += 1;
+							}
+						}
+						else if(critical_apps == 3)
+						{
+							if(n_apps == 3 && (l3_occup_task <= 0.85*num_ways_CLOS_2))
+                            {
+                            	LOGINF("ONLY occupied {} when there is {} available --> RETURN"_format(total_space,num_ways_CLOS_2));
+                                return;
+                            }
+                            else if(n_apps < 3)
+                            {
+                            	total_space += l3_occup_task;
+                                n_apps += 1;
+                            }
+						}
+					}
+					else if(!outlierValue && CLOS_key <= 5)
+                    {
+						// non-critical app
                         auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
                         uint64_t CLOSvalue = std::get<1>(*it2);
 						assert(CLOSvalue>=1 && CLOSvalue<=5);
 						LOGINF("YYY Task {} in CLOS {} has llc_occup {}"_format(pidTask,CLOSvalue,l3_occup_task));
-
 
 						if(l3_occup_task > 3 && CLOSvalue == 1)
 						{
