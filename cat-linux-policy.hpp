@@ -76,7 +76,7 @@ class CriticalAware: public LinuxBase
     uint64_t maskNonCrCLOS = 0xfffff;
     uint64_t num_ways_CLOS_1 = 20;
 
-    uint64_t num_shared_ways = 0;
+    int64_t num_shared_ways = 0;
 
     //Control of the changes made in the masks
     uint64_t state = 0;
@@ -144,7 +144,7 @@ class CriticalAwareV2: public LinuxBase
     uint64_t num_ways_CLOS_2 = 20;
     uint64_t maskNonCrCLOS = 0xfffff;
     uint64_t num_ways_CLOS_1 = 20;
-	uint64_t num_shared_ways = 0;
+	int64_t num_shared_ways = 0;
 	uint64_t prev_critical_apps = 0;
 
     // Control of the changes made in the masks

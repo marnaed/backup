@@ -588,7 +588,8 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 					LOGINF("COS 2 (CR)     has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
                     LOGINF("COS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
 
-                    num_shared_ways = (num_ways_CLOS_2 + num_ways_CLOS_1) - 20;
+					int64_t aux_ns = (num_ways_CLOS_2 + num_ways_CLOS_1) - 20;
+                    num_shared_ways = (aux_ns < 0) ? 0 : aux_ns;
                     LOGINF("Number of shared ways: {}"_format(num_shared_ways));
                     assert(num_shared_ways >= 0);
 
@@ -1245,7 +1246,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					LOGINF("COS 2 (CR)     has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
 					LOGINF("COS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
 
-					num_shared_ways = (num_ways_CLOS_2 + num_ways_CLOS_1) - 20;
+					int64_t aux_ns = (num_ways_CLOS_2 + num_ways_CLOS_1) - 20;
+					num_shared_ways = (aux_ns < 0) ? 0 : aux_ns;
 					LOGINF("Number of shared ways: {}"_format(num_shared_ways));
 					assert(num_shared_ways >= 0);
 
