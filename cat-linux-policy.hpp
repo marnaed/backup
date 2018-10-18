@@ -180,6 +180,12 @@ class CriticalAwareV2: public LinuxBase
 
     uint64_t CLOS_key = 3;
 
+	//dictinary holding previous value of critical apps
+	std::map<pid_t, double> ipc_critical_prev;
+	bool false_critical_app = false;
+	pid_t excluded_application;
+	double excluded_application_ipc;
+
 	// dictionary holding deque with 3 last MPKIL3 values for each task
 	std::map<pid_t, std::deque<double>> deque_mpkil3;
 

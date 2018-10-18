@@ -637,13 +637,16 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 	if((num_critical_new == 0) | (num_critical_new >= 4)){
 		// assign CLOSes mask 0xfffff
 		for( int clos = 1; clos < 5; clos += 1 )
-			LinuxBase::get_cat()->set_cbm(clos,0xfffff);
+		{
+			if (clos != 4)
+				LinuxBase::get_cat()->set_cbm(clos,0xfffff);
+		}
 		// assign all apps to CLOS 1
 		for (const auto &item : v)
 		{
 			pid_t taskPID = std::get<0>(item);
 			uint64_t CLOS = std::get<1>(item);
-			if (CLOS != 1)
+			if ((CLOS != 1) && (CLOS != 4))
 			{
 				LinuxBase::get_cat()->add_task(1,taskPID);
 				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple)  == taskPID;});
@@ -896,6 +899,14 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			{
 				// Check CLOS value of task
 				uint64_t CLOS_val = LinuxBase::get_cat()->get_clos_of_task(taskPID);
+
+				// Check is restarted app is the excluded app
+				if (CLOS_val == 4)
+				{
+					excluded_application = taskPID;
+					LOGINF("Exluded app has been restarted --> taskPID updated");
+				}
+
 				// Add new pair
 				taskIsInCRCLOS.push_back(std::make_pair(taskPID,CLOS_val));
 				LOGINF("RESTARTED TASK {} in CLOS {} HAS BEEN ADDED to taskIsInCRCLOS"_format(taskPID,CLOS_val));
@@ -1211,7 +1222,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						// Assign app to an isolated CLOS with 2 ways
 						LinuxBase::get_cat()->set_cbm(4,0x00030);
 						LinuxBase::get_cat()->add_task(4,pidTask);
-						LOGINF("!!!! TASK {} isolated !!!"_format(pidTask));
+						uint64_t c = LinuxBase::get_cat()->get_clos_of_task(pidTask);
+						LOGINF("!!!! TASK {} isolated in CLOS {} !!!"_format(pidTask,c));
 
 						// Make app task no longer eligible to be critical
 						excluded_application = pidTask;
@@ -1227,18 +1239,36 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						critical_apps -= 1;
 						ipc_CR -= ipcTask;
 					}
-					else if(false_critical_app)
-					{
-						// Check if false_critical app is worse
-						if(ipcTask < 0.7*ipc_prev)
-							LOGINF("XX Isolated app {} is BAD ({} compared to {})"_format(pidTask,ipcTask,ipc_prev));
-						else
-							LOGINF("XX Isolated app {} is GOOD ({} compared to {})"_format(pidTask,ipcTask,ipc_prev));
-					}
 
 					// Update dictionary
 					itc->second = ipcTask;
 				}
+
+				// Remove false critical from dictionary
+				ipc_critical_prev.erase(excluded_application);
+
+				// Check status of isolated application
+				if(false_critical_app)
+				{
+					pidTask = excluded_application;
+					// Find current IPC
+					auto itW = std::find_if(v_ipc.begin(), v_ipc.end(),[&pidTask](const  auto& tuple) {return std::get<0>(tuple) == pidTask;});
+              		double ipcEXcl = std::get<1>(*itW);
+					uint64_t c = LinuxBase::get_cat()->get_clos_of_task(excluded_application);
+
+					// Check if false_critical app is worse
+					if(ipcEXcl < 0.7*excluded_application_ipc)
+						LOGINF("XX Isolated app {} in CLOS {} is BAD ({} compared to {})"_format(excluded_application,c,ipcEXcl,excluded_application_ipc));
+					else
+						LOGINF("XX Isolated app {} in CLOS {} is GOOD ({} compared to {})"_format(excluded_application,c,ipcEXcl,excluded_application_ipc));
+
+					assert(c==4);
+
+					// update ipc
+					excluded_application_ipc = ipcEXcl;
+				}
+
+
 
 				//LOGINF("IPC total = {}"_format(ipcTotal));
 				//LOGINF("Expected IPC total = {}"_format(expectedIPCtotal));
