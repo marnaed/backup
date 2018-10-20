@@ -893,6 +893,12 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			pid_t taskPID = std::get<0>(item);
 			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple)  == taskPID;});
 			it2 = taskIsInCRCLOS.erase(it2);
+
+			// Erase value if in previous critical
+			auto it3 = ipc_critical_prev.find(taskPID);
+  			if (it3 != ipc_critical_prev.end())
+    			ipc_critical_prev.erase(it3);
+
 		}
 		aux.clear();
 
@@ -1055,12 +1061,12 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         num_ways_CLOS_2 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(2));
 		assert((num_ways_CLOS_1>0) & (num_ways_CLOS_1<=20));
 		assert((num_ways_CLOS_2>0) & (num_ways_CLOS_2<=20));
-		num_shared_ways = num_ways_CLOS_2 - num_ways_CLOS_1;
+		num_shared_ways = (num_ways_CLOS_2 + num_ways_CLOS_1) - 20;
 
         LOGINF("CLOS 2 (CR) now has mask {:#x}"_format(maskCrCLOS));
         LOGINF("CLOS 1 (non-CR) now has mask {:#x}"_format(maskNonCrCLOS));
 
-		assert(num_shared_ways == 2);
+		assert(num_shared_ways >= 0);
 
         // Assign each task to its corresponding CLOS
         for (const auto &item : outlier)
