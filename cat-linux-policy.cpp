@@ -1287,6 +1287,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				double UP_limit_IPC = expectedIPCtotal * 1.04;
 				double NCR_limit_IPC = ipc_NCR_prev*0.96;
 				double CR_limit_IPC = ipc_CR_prev*0.96;
+				bool equal = false;
 
 				if(ipcTotal > UP_limit_IPC)
 					LOGINF("New IPC is BETTER: IPCtotal {} > {}"_format(ipcTotal,UP_limit_IPC));
@@ -1297,13 +1298,16 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				else if( (ipc_CR < CR_limit_IPC) && (ipc_NCR < NCR_limit_IPC))
 					LOGINF("BOTH IPCs are WORSE: CR {} < {} && NCR {} < {}"_format(ipc_CR,CR_limit_IPC,ipc_NCR,NCR_limit_IPC));
 				else
+				{
 					LOGINF("BOTH IPCs are EQUAL (NOT WORSE)");
+					equal = true;
+				}
 
 				//transitions switch-case
 				switch (state)
 				{
 					case 1: case 2: case 3: case 7: case 8:
-						if(ipcTotal > UP_limit_IPC)
+						if((ipcTotal > UP_limit_IPC) | (equal))
 							idle = true;
 						else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
 							state = 6;
