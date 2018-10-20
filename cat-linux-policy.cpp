@@ -636,10 +636,10 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 	// If 4 critical apps detected
 	if((num_critical_new == 0) | (num_critical_new >= 4)){
 		// assign CLOSes mask 0xfffff
-		for( int clos = 1; clos < 5; clos += 1 )
+		for( int clos = 1; clos <= 3; clos += 1 )
 		{
-			if (clos != 4)
-				LinuxBase::get_cat()->set_cbm(clos,0xfffff);
+			//if (clos != 4)
+			LinuxBase::get_cat()->set_cbm(clos,0xfffff);
 		}
 		// assign all apps to CLOS 1
 		for (const auto &item : v)
@@ -688,7 +688,8 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 			// Application has not suffered criticality change
 			// Return non-critical app(s) in CLOS 3 or 5 to CLOS 1
 			uint64_t clos_value = std::get<1>(item);
-			if((clos_value == 3) | (clos_value == 5))
+			//if((clos_value == 3) | (clos_value == 5))
+			if( clos_value == 3 )
 			{
 				LOGINF("CLOS {}"_format(clos_value));
 				LinuxBase::get_cat()->add_task(1,taskPID);
@@ -1184,11 +1185,11 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                             }
 						}
 					}
-					else if(!outlierValue && CLOS_key <= 5)
+					else if(!outlierValue && CLOS_key <= 3)
                     {
                         auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
                         uint64_t CLOSvalue = std::get<1>(*it2);
-						assert((CLOSvalue >= 1) && (CLOSvalue <= 5));
+						assert((CLOSvalue >= 1) && (CLOSvalue <= 3));
 
 						// Check if there is a non-critical application occupying more space than it should
 						if((l3_occup_mb_task > 3) && (CLOSvalue == 1))
@@ -1235,7 +1236,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					if((!false_critical_app) && (ipcTask < 1.3*ipc_prev))
 					{
 						// Assign app to an isolated CLOS with 2 ways
-						LinuxBase::get_cat()->set_cbm(4,0x00030);
+						LinuxBase::get_cat()->set_cbm(4,0x0000C);
 						LinuxBase::get_cat()->add_task(4,pidTask);
 						uint64_t c = LinuxBase::get_cat()->get_clos_of_task(pidTask);
 						LOGINF("!!!! TASK {} isolated in CLOS {} !!!"_format(pidTask,c));

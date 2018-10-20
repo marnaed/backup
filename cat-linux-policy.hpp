@@ -173,9 +173,9 @@ class CriticalAwareV2: public LinuxBase
     std::map<pid_t,uint64_t> frequencyCritical;
 
     // dictionary with CLOSes and corresponding masks
+	// { 5, 0x0000C }
     std::map<uint64_t, uint64_t> clos_mask = {
-        { 3, 0x00003 },
-        { 5, 0x0000C }
+        { 3, 0x00003 }
     };
 
     uint64_t CLOS_key = 3;
