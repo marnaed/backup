@@ -10,6 +10,9 @@
 #include <fmt/format.h>
 #include <yaml-cpp/yaml.h>
 
+#include <signal.h>
+#include <setjmp.h>
+
 #include "cat-intel.hpp"
 #include "cat-linux.hpp"
 #include "cat-policy.hpp"
@@ -46,6 +49,10 @@ std::string program_options_to_string(const std::vector<po::option>& raw);
 void adjust_time(const time_point_t &start_int, const time_point_t &start_glob, const uint64_t interval, const uint64_t time_int_us, int64_t &adj_delay_us);
 void herod_the_great();
 void sigint_handler(int signum);
+void sigabrt_handler(int signum);
+
+// Signal
+jmp_buf return_to_top_level;
 
 
 CAT_ptr_t cat_setup(const string &kind, const vector<Cos> &coslist)
@@ -382,16 +389,29 @@ void herod_the_great()
 
 void sigint_handler(int signum)
 {
-	LOGWAR("SIGINT received, killing all child preocesses");
-	herod_the_great();
-	exit(signum);
+	LOGWAR("-- SIGINT received --");
+	//LOGWAR("Killing all child processes");
+	//herod_the_great();
+	longjmp (return_to_top_level,1);
+	//exit(signum);
 }
+
+void sigabrt_handler(int signum)
+{
+	LOGWAR("-- SIGABRT received --");
+    //LOGWAR("Killing all child processes");
+    //herod_the_great();
+	longjmp (return_to_top_level,1);
+    //exit(signum);
+}
+
 
 
 int main(int argc, char *argv[])
 {
 	srand(time(NULL));
 	signal(SIGINT, sigint_handler);
+	signal(SIGABRT, sigabrt_handler);
 
 	// Set the locale to the one defined in the corresponding enviroment variable
 	std::setlocale(LC_ALL, "");
@@ -543,7 +563,16 @@ int main(int argc, char *argv[])
 
 		// Start doing things
 		LOGINF("Start main loop");
-		loop(tasklist, sched, catpol, perf, options.event, options.ti * 1000 * 1000, options.mi, *int_out, *ucompl_out, *total_out);
+		if (setjmp(return_to_top_level) == 0)
+			loop(tasklist, sched, catpol, perf, options.event, options.ti * 1000 * 1000, options.mi, *int_out, *ucompl_out, *total_out);
+		else
+			clean_and_die(tasklist, catpol->get_cat(), perf);
+		// Leaving consistent state after throwing signal
+		//int val = setjmp (return_to_top_level);
+		//LOGWAR("val = {}"_format(val));
+		//if (val)
+		//	clean_and_die(tasklist, catpol->get_cat(), perf);
+
 
 		// Kill tasks, reset CAT, performance monitors, etc...
 		clean(tasklist, catpol->get_cat(), perf);
