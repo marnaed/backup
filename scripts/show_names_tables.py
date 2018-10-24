@@ -14,13 +14,16 @@ def main():
     parser.add_argument('-od', '--outputdir', default='./output', help='Directory where output files will be placed')
     parser.add_argument('-id', '--inputdir', default='./data', help='Directory where input are found')
     parser.add_argument('-n', '--names', action='append', default=[], help='Names of columns we want to generate tables')
+    parser.add_argument('-p', '--policies', action='append', default=[], help='Policies we want to show results of. Options: noPart,criticalAware,criticalAwareV2,dunn.')
+    parser.add_argument('-dp', '--defaultPolicy', default='noPart', help='Default policy used as a basis to compare the other ones.')
+
     args = parser.parse_args()
 
     # dictionary with names of headers of data we want to include in the tables
     dictNames = {}
-
     # policies used
-    policies = ['noPart', 'criticalAware']
+    #policies = ['noPart', 'criticalAware', 'criticalAwareV2']
+    #policies = ['noPart', 'criticalAware']
 
     # include names in dictionary
     for name in args.names:
@@ -32,7 +35,7 @@ def main():
     outputPath= os.path.abspath(args.outputdir)
 
     columns = ['Workload_ID','Workload']
-    for p in policies:
+    for p in args.policies:
     	columns.append(p)
 
     index = range(0, 34)
@@ -45,12 +48,14 @@ def main():
         dictNames[name] = df
 
     # add values
-    for policy in policies:
+    for policy in args.policies:
         numW = 0
+        print(policy)
         for wl_id, wl in enumerate(workloads):
 
             #name of the file with raw data
             wl_show_name = "-".join(wl)
+            print(wl_show_name)
 
             for name in args.names:
                 df = dictNames[name]
@@ -70,14 +75,20 @@ def main():
 
         df = dictNames[name]
         show_name = name.replace("/", "-")
-        if name == "ipc":
-            df["%gain"] = ((df["criticalAware"] / df["noPart"]) - 1) * 100
-        else:
-            df["%gain"] = ((df["noPart"] / df["criticalAware"]) - 1) * 100
+        for policy in args.policies:
+            if policy != args.defaultPolicy:
+                if name == "ipc":
+                    df["%gain"+policy] = ((df[policy] / df[args.defaultPolicy]) - 1) * 100
+                    #df["%gainCAV2"] = ((df["criticalAwareV2"] / df["noPart"]) - 1) * 100
+                else:
+                    df["%gain"+policy] = ((df[args.defaultPolicy] / df[policy]) - 1) * 100
+                    #df["%gainCAV2"] = ((df["noPart"] / df["criticalAwareV2"]) - 1) * 100
 
         print(name)
-        print(df["%gain"].mean())
-        print(df["%gain"].max())
+        for policy in args.policies:
+            if policy != args.defaultPolicy:
+                print(df["%gain"+policy].mean())
+        #print(df["%gainCAV2"].mean())
         print(" ")
 
 
