@@ -915,6 +915,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 			deque_aux.push_front(MPKIL3);
 
+			double insert_value;
 			if(deque_aux.size() == 3)
 			{
 				LOGINF("{}: {} {} {}"_format(taskPID,deque_aux[0],deque_aux[1],deque_aux[2]));
@@ -923,17 +924,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				if ((deque_aux[1] >= 2*deque_aux[0]) & (deque_aux[1] >= 2*deque_aux[2]))
 				{
 					// Middle value is a spike -> remove middle value and insert last value to all_mpkil3
-					v_mpkil3.push_back(std::make_pair(taskPID,deque_aux[2]));
-
-					// Add value to mpkil3_prev vector
-					auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple) == taskPID;});
-					if(it_pm == v_mpkil3_prev.end())
-						v_mpkil3_prev.push_back(std::make_pair(taskPID,deque_aux[2]));
-					else
-						std::get<1>(*it_pm) = deque_aux[2];
-
 					//all_mpkil3.insert(deque_aux[2]);
-					deque_valid.push_front(deque_aux[2]);
+					insert_value = deque_aux[2];
+					deque_valid.push_front(insert_value);
 					deque_aux.pop_back(); //remove value 2
 					deque_aux.pop_back(); //remove value 1
 				}
@@ -941,11 +934,22 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					// Middle value is not a spike value
 					double aux = (deque_aux[1] + deque_aux[2]) / 2;
-					v_mpkil3.push_back(std::make_pair(taskPID,aux));
+					insert_value = aux;
 					//all_mpkil3.insert(deque_aux[2]);
-					deque_valid.push_front(deque_aux[2]);
+					deque_valid.push_front(insert_value);
 					deque_aux.pop_back(); //remove value 2
 				}
+
+				// Add value to current mpkil3 vector
+				v_mpkil3.push_back(std::make_pair(taskPID,insert_value));
+
+				// Add value to mpkil3_prev vector
+				auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple) == taskPID;});
+                if(it_pm == v_mpkil3_prev.end())
+                	v_mpkil3_prev.push_back(std::make_pair(taskPID,insert_value));
+                else
+                    std::get<1>(*it_pm) = insert_value;
+
 
 			}
 			else if(current_interval >= firstInterval)
@@ -965,6 +969,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			// Add a new entry in the dictionary
             deque_mpkil3[taskPID].push_front(MPKIL3);
 			valid_mpkil3[taskPID] = std::deque<double>();
+
+			// Add in vector in case this apps has been restarted
+			v_mpkil3.push_back(std::make_pair(taskPID,MPKIL3));
         }
 
 	}
@@ -999,6 +1006,10 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			pid_t taskPID = std::get<0>(item);
 			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple)  == taskPID;});
 			it2 = taskIsInCRCLOS.erase(it2);
+
+			// Erase entries of old PID from dictionary
+			deque_mpkil3.erase(taskPID);
+			valid_mpkil3.erase(taskPID);
 
 			// Erase value if in previous critical
 			//auto it3 = ipc_critical_prev.find(taskPID);
