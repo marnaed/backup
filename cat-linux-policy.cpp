@@ -143,12 +143,16 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
     auto v_ipc = std::vector<pairD_t>();
 	auto v_l3_occup_mb = std::vector<pairD_t>();
 
+	// Vector with current active tasks
+    auto active_tasks = std::vector<pid_t>();
+
 	auto outlier = std::vector<pair_t>();
 
     double ipcTotal = 0, mpkiL3Total = 0;
     //double missesL3Total = 0, instsTotal = 0;
 	double ipc_CR = 0;
     double ipc_NCR = 0;
+	double l3_occup_mb_total = 0;
 
     uint64_t newMaskNonCr, newMaskCr;
 
@@ -170,21 +174,73 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 		uint64_t l3_miss = task.stats.last("mem_load_uops_retired.l3_miss");
 		uint64_t inst = task.stats.last("instructions");
 		double ipc = task.stats.last("ipc");
+		double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024 / 1024;
+
+		l3_occup_mb_total += l3_occup_mb;
 
 		double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
 
-        LOGINF("Task {}: MPKI_L3 = {}"_format(taskName,MPKIL3));
-        v.push_back(std::make_pair(taskPID, MPKIL3));
+        //LOGINF("Task {}: MPKI_L3 = {}"_format(taskName,MPKIL3));
+        LOGINF("Task {} ({}): IPC = {}, MPKI_L3 = {}, l3_occup_mb {}"_format(taskName,taskPID,ipc,MPKIL3,l3_occup_mb));
+		v.push_back(std::make_pair(taskPID, MPKIL3));
         v_ipc.push_back(std::make_pair(taskPID, ipc));
 		pid_CPU.push_back(std::make_pair(taskPID,cpu));
+		active_tasks.push_back(taskPID);
 
         ipcTotal += ipc;
 		mpkiL3Total += MPKIL3;
 	}
 
+	// Perform no further action if cache-warmup time has not passed
+    if (current_interval < firstInterval)
+		return;
+
+    // Check if taskIsInCRCLOS holds only current tasks
+    // aux = vector to store reset values
+    auto aux = std::vector<pair_t>();
+    for (const auto &item : taskIsInCRCLOS)
+    {
+    	pid_t taskPID = std::get<0>(item);
+        uint64_t CLOS_val =std::get<1>(item);
+        if ( std::find(active_tasks.begin(), active_tasks.end(), taskPID) == active_tasks.end() )
+        {
+        	LOGINF("TASK {} HAS BEEN RESTARTED "_format(taskPID));
+            // Save task no longer active
+            aux.push_back(std::make_pair(taskPID,CLOS_val));
+        }
+    }
+
+    if (!aux.empty())
+    {
+		// Remove tasks no longer active from taskIsInCRCLOS
+        for (const auto &item : aux)
+        {
+        	pid_t taskPID = std::get<0>(item);
+            auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple)  == taskPID;});
+            it2 = taskIsInCRCLOS.erase(it2);
+        }
+        aux.clear();
+
+		// Add new active tasks to taskIsInCRCLOS
+        for (const auto &item : active_tasks)
+        {
+            pid_t taskPID = item;
+            auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskPID](const auto& tuple) {return std::get<0>(tuple)  == taskPID;});
+            if(it2 == taskIsInCRCLOS.end())
+            {
+                // Check CLOS value of task
+                uint64_t CLOS_val = LinuxBase::get_cat()->get_clos_of_task(taskPID);
+
+                // Add new pair
+                taskIsInCRCLOS.push_back(std::make_pair(taskPID,CLOS_val));
+                LOGINF("RESTARTED TASK {} in CLOS {} HAS BEEN ADDED to taskIsInCRCLOS"_format(taskPID,CLOS_val));
+            }
+        }
+    }
 
     // calculate total MPKIL3 mean of interval
 	double meanMPKIL3Total = mpkiL3Total / tasklist.size();
+	LOGINF("Total L3 occupation: {}"_format(l3_occup_mb_total));
 	LOGINF("Mean MPKI_LLC_Total (/{}) = {}"_format(tasklist.size(), meanMPKIL3Total));
 
     // PROCESS DATA
@@ -412,6 +468,7 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 
 				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
 				uint64_t CLOSvalue = std::get<1>(*it2);
+				assert((CLOSvalue == 1) | (CLOSvalue == 2));
 
 
                 if(outlierValue && (CLOSvalue % 2 != 0))
@@ -614,6 +671,40 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 
 /////////////// CRITICAL-AWARE v2 ///////////////
 
+void CriticalAwareV2::reset_configuration(const tasklist_t &tasklist)
+{
+    for (const auto &task_ptr : tasklist)
+    {
+        const Task &task = *task_ptr;
+        pid_t taskPID = task.pid;
+        LinuxBase::get_cat()->add_task(1,taskPID);
+    }
+
+	taskIsInCRCLOS.clear();
+
+    //change masks of CLOS to 0xfffff
+    LinuxBase::get_cat()->set_cbm(1,0xfffff);
+    LinuxBase::get_cat()->set_cbm(2,0xfffff);
+
+    firstTime = 1;
+    state = 0;
+    expectedIPCtotal = 0;
+
+    maskCrCLOS = 0xfffff;
+    maskNonCrCLOS = 0xfffff;
+
+    num_ways_CLOS_2 = 20;
+    num_ways_CLOS_1 = 20;
+
+    num_shared_ways = 0;
+
+    idle = false;
+    idle_count = IDLE_INTERVALS;
+
+    LOGINF("Reset performed. Original configuration restored");
+}
+
+
 /*
  * Auxiliar method of Critical Alone policy to reset configuration
  */
@@ -757,6 +848,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     auto v_ipc = std::vector<pairD_t>();
     auto v_l3_occup_mb = std::vector<pairD_t>();
 	auto v_mpkil3 = std::vector<pairD_t>();
+	auto all_mpkil3 = std::set<double>();
 
 	// Vector with current active tasks
 	auto active_tasks = std::vector<pid_t>();
@@ -811,13 +903,22 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		// Update queue of each task with last value of MPKI-L3
 		// Do not consider the excluded application
 		auto it = deque_mpkil3.find(taskPID);
+		auto it2 = valid_mpkil3.find(taskPID);
+
         if((it != deque_mpkil3.end()) & (taskPID != excluded_application))
 		{
 			std::deque<double> deque_aux = it->second;
+			std::deque<double> deque_valid = it2->second;
+			// Remove one value if size is equal to sliding window size
+			if (deque_valid.size() == 10)
+				deque_valid.pop_back();
+
 			deque_aux.push_front(MPKIL3);
 
 			if(deque_aux.size() == 3)
 			{
+				LOGINF("{}: {} {} {}"_format(taskPID,deque_aux[0],deque_aux[1],deque_aux[2]));
+
 				// Check middle value is not a spike
 				if ((deque_aux[1] >= 2*deque_aux[0]) & (deque_aux[1] >= 2*deque_aux[2]))
 				{
@@ -831,7 +932,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					else
 						std::get<1>(*it_pm) = deque_aux[2];
 
-					all_mpkil3.insert(deque_aux[2]);
+					//all_mpkil3.insert(deque_aux[2]);
+					deque_valid.push_front(deque_aux[2]);
 					deque_aux.pop_back(); //remove value 2
 					deque_aux.pop_back(); //remove value 1
 				}
@@ -840,7 +942,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					// Middle value is not a spike value
 					double aux = (deque_aux[1] + deque_aux[2]) / 2;
 					v_mpkil3.push_back(std::make_pair(taskPID,aux));
-					all_mpkil3.insert(deque_aux[2]);
+					//all_mpkil3.insert(deque_aux[2]);
+					deque_valid.push_front(deque_aux[2]);
 					deque_aux.pop_back(); //remove value 2
 				}
 
@@ -855,11 +958,13 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 			// Store queue modified in the dictionary
 			deque_mpkil3[taskPID] = deque_aux;
+			valid_mpkil3[taskPID] = deque_valid;
 		}
         else
         {
 			// Add a new entry in the dictionary
             deque_mpkil3[taskPID].push_front(MPKIL3);
+			valid_mpkil3[taskPID] = std::deque<double>();
         }
 
 	}
@@ -896,9 +1001,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			it2 = taskIsInCRCLOS.erase(it2);
 
 			// Erase value if in previous critical
-			auto it3 = ipc_critical_prev.find(taskPID);
-  			if (it3 != ipc_critical_prev.end())
-    			ipc_critical_prev.erase(it3);
+			//auto it3 = ipc_critical_prev.find(taskPID);
+  			//if (it3 != ipc_critical_prev.end())
+    		//	ipc_critical_prev.erase(it3);
 
 		}
 		aux.clear();
@@ -914,21 +1019,28 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				uint64_t CLOS_val = LinuxBase::get_cat()->get_clos_of_task(taskPID);
 
 				// Check is restarted app is the excluded app
-				if (CLOS_val == 4)
-				{
-					excluded_application = taskPID;
-					LOGINF("Exluded app has been restarted --> taskPID updated");
-				}
-				else if (CLOS_val == 2)
-				{
-					// Add new entry in the dictionary
-				}
+				//if (CLOS_val == 4)
+				//{
+				//	excluded_application = taskPID;
+				//	LOGINF("Exluded app has been restarted --> taskPID updated");
+				//}
 
 				// Add new pair
 				taskIsInCRCLOS.push_back(std::make_pair(taskPID,CLOS_val));
 				LOGINF("RESTARTED TASK {} in CLOS {} HAS BEEN ADDED to taskIsInCRCLOS"_format(taskPID,CLOS_val));
 			}
 		}
+	}
+
+	// Add values of MPKIL3 from each app to the set
+	for (auto const &x : valid_mpkil3)
+	{
+		// Get deque
+		std::deque<double> val = x.second;
+		// Add values
+		for (auto i = val.cbegin(); i != val.cend(); ++i)
+			all_mpkil3.insert(*i);
+
 	}
 
 	// Calculate IQR = Q3 - Q1
@@ -942,6 +1054,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	// Calculate limit outlier
 	double limit_outlier = Q3 + (IQR * 1.5);
     LOGINF("limit_outlier = {}"_format(limit_outlier));
+
+	// Clear set
+	all_mpkil3.clear();
 
     // Check if MPKI-L3 of each APP is 2 stds o more higher than the mean MPKI-L3
     for (const auto &item : v_mpkil3)
@@ -966,7 +1081,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                 	freqCritical = it->second;
             	else
             	{
-                	//LOGINF("TASK RESTARTED --> INCLUDE IT AGAIN IN frequencyCritical");
+                	LOGINF("TASK RESTARTED --> INCLUDE IT AGAIN IN frequencyCritical");
                 	frequencyCritical[pidTask] = 0;
                 	freqCritical = 0;
             	}
@@ -1006,7 +1121,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     LOGINF("critical_apps = {}"_format(critical_apps));
 
 	// Keep count of consecutive intervals no critical apps are detected
-	if (critical_apps == 0)
+	/*if (critical_apps == 0)
 		num_no_critical += 1;
 	else
 		num_no_critical = 0;
@@ -1020,7 +1135,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     	std::set<double>::iterator itN = all_mpkil3.upper_bound(max_mpkil3);
 		all_mpkil3.erase(itN,all_mpkil3.end());
 		LOGINF("RRR Size after erase:{}"_format(all_mpkil3.size()));
-	}
+	}*/
 
 	// If no previous configuration has been established (firstTime = true)
     if (firstTime)
@@ -1114,6 +1229,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple)  == pidTask;});
             uint64_t CLOSvalue = std::get<1>(*it2);
+			LOGINF("CLOSvalue = {}"_format(CLOSvalue));
 			assert((CLOSvalue >= 1) && (CLOSvalue <= 5));
 
 			if(outlierValue && (CLOSvalue % 2 != 0))
@@ -1137,13 +1253,16 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 		// Update configuration if there is a change in the number of critical apps
         if(change_in_outliers)
-            update_configuration(taskIsInCRCLOS, status,prev_critical_apps,critical_apps);
+		{
+			reset_configuration(tasklist);
+            //update_configuration(taskIsInCRCLOS, status,prev_critical_apps,critical_apps);
+		}
 		else
         {
 			// If there is no new critical app, modify masks
             if((critical_apps > 0) && (critical_apps < 4))
             {
-				uint64_t n_apps = 0;
+				/*nt64_t n_apps = 0;
 				double total_space = 0;
 
                 for (const auto &item : outlier)
@@ -1218,14 +1337,14 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						}
 					} // End if(outlierValue)
 
-				} // End for loop
+				}*/ //End for loop
 
-				std::map<pid_t,double>::iterator itc;
+				//std::map<pid_t,double>::iterator itc;
 
 				// Check if a NEW critical app is not making profitable use of the space
 				// This will be the case if the IPC of the critical application
 				// has not improved more than 3%
-				for ( itc = ipc_critical_prev.begin(); itc != ipc_critical_prev.end(); itc++ )
+				/*for ( itc = ipc_critical_prev.begin(); itc != ipc_critical_prev.end(); itc++ )
 				{
 					pidTask = itc->first;
 					double ipc_prev = itc->second;
@@ -1279,15 +1398,15 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 					// update ipc
 					excluded_application_ipc = ipcEXcl;
-				}
+				}*/
 
 
 
 				LOGINF("IPC total {} vs.Expected IPC total {}"_format(ipcTotal,expectedIPCtotal));
 				double UP_limit_IPC = expectedIPCtotal * 1.04;
+				double LOW_limit_IPC = expectedIPCtotal  * 0.96;
 				double NCR_limit_IPC = ipc_NCR_prev*0.96;
 				double CR_limit_IPC = ipc_CR_prev*0.96;
-				bool equal = false;
 
 				if(ipcTotal > UP_limit_IPC)
 					LOGINF("New IPC is BETTER: IPCtotal {} > {}"_format(ipcTotal,UP_limit_IPC));
@@ -1298,13 +1417,52 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				else if( (ipc_CR < CR_limit_IPC) && (ipc_NCR < NCR_limit_IPC))
 					LOGINF("BOTH IPCs are WORSE: CR {} < {} && NCR {} < {}"_format(ipc_CR,CR_limit_IPC,ipc_NCR,NCR_limit_IPC));
 				else
-				{
 					LOGINF("BOTH IPCs are EQUAL (NOT WORSE)");
-					equal = true;
-				}
 
 				//transitions switch-case
 				switch (state)
+                {
+                	case 1: case 2: case 3:
+                        if(ipcTotal > UP_limit_IPC)
+                            idle = true;
+                        else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+                            state = 5;
+                     	else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+                            state = 6;
+                        else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+                            state = 5;
+                        else
+                            state = 5;
+                        break;
+
+                    case 5: case 6:
+                        if(ipcTotal > UP_limit_IPC)
+                            idle = true;
+                        else if( (ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+                            state = 8;
+                        else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+                            state = 7;
+                        else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+                            state = 8;
+                        else // NCR and CR worse
+                            state = 8;
+                        break;
+
+                    case 7: case 8:
+                        if(ipcTotal > UP_limit_IPC)
+                            idle = true;
+                        else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+                            state = 5;
+                        else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+                            state = 6;
+                        else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+                            state = 5;
+                        else // NCR and CR worse
+                            state = 5;
+                        break;
+                }
+
+				/*switch (state)
 				{
 					case 1: case 2: case 3: case 7: case 8:
 						if((ipcTotal > UP_limit_IPC) | (equal))
@@ -1322,7 +1480,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						else
 							state = 8;
 						break;
-				}
+				}*/
 
 				// State actions switch-case
 				if(idle)
@@ -1334,21 +1492,25 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						case 5:
 							LOGINF("NCR-- (Remove one shared way from CLOS with non-critical apps)");
 							maskNonCrCLOS = (maskNonCrCLOS >> 1) & maskNonCrCLOS;
+							assert(maskNonCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							break;
 						case 6:
 							LOGINF("CR-- (Remove one shared way from CLOS with critical apps)");
 							maskCrCLOS = (maskCrCLOS << 1) & maskCrCLOS;
+							assert(maskCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 							break;
 						case 7:
 							LOGINF("NCR++ (Add one shared way to CLOS with non-critical apps)");
 							maskNonCrCLOS = (maskNonCrCLOS << 1) | maskNonCrCLOS;
+							assert(maskNonCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							break;
 						case 8:
 							LOGINF("CR++ (Add one shared way to CLOS with critical apps)");
 							maskCrCLOS = (maskCrCLOS >> 1) | maskCrCLOS;
+							assert(maskCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 							break;
 						default:

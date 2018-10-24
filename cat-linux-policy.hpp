@@ -164,7 +164,7 @@ class CriticalAwareV2: public LinuxBase
     // vector to store if task is assigned to critical CLOS
     typedef std::tuple<pid_t, uint64_t> pair_t;
 	typedef std::tuple<pid_t, double> pairD_t;
-	std::set<double> all_mpkil3;
+	//std::set<double> all_mpkil3;
     std::vector<pair_t> taskIsInCRCLOS;
     std::vector<pair_t> pid_CPU;
 	std::vector<pairD_t> v_mpkil3_prev;
@@ -188,6 +188,8 @@ class CriticalAwareV2: public LinuxBase
 
 	// dictionary holding deque with 3 last MPKIL3 values for each task
 	std::map<pid_t, std::deque<double>> deque_mpkil3;
+	// dictionary holding up to 10 last MPKIL3 valid (non-spike) values
+	std::map<pid_t, std::deque<double>> valid_mpkil3;
 
 	// number of times consecutive critical_apps = 0 detected
 	uint64_t num_no_critical = 0;
@@ -197,6 +199,8 @@ class CriticalAwareV2: public LinuxBase
 	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval) : every(_every), firstInterval(_firstInterval) {}
 
     virtual ~CriticalAwareV2() = default;
+
+	void reset_configuration(const tasklist_t &);
 
     //configure CAT
     void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
