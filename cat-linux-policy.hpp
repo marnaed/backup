@@ -178,6 +178,9 @@ class CriticalAwareV2: public LinuxBase
         { 3, 0x00003 }
     };
 
+	// Maximum value of MPKI-L3 in the current interval
+    double max_mpkil3 = 0;
+
     uint64_t CLOS_key = 3;
 
 	//dictinary holding previous value of critical apps
