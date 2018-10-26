@@ -873,7 +873,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	pid_t pidTask;
 	// Maximum value of MPKI-L3 in the current interval
-	double max_mpkil3 = 0;
+	//double max_mpkil3 = 0;
 
     // Gather data for each task
     for (const auto &task_ptr : tasklist)
@@ -1049,10 +1049,22 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		// Get deque
 		std::deque<double> val = x.second;
 		// Add values
+		std::string res;
 		for (auto i = val.cbegin(); i != val.cend(); ++i)
+		{
+			res = res + std::to_string(*i) + " ";
 			all_mpkil3.insert(*i);
-
+		}
+		LOGINF(res);
 	}
+
+	// Remove all values greater than limit outlier
+	LOGINF("Max. MPKIL3 of previous interval {}"_format(max_mpkil3));
+    LOGINF("RRR Size before erase:{}"_format(all_mpkil3.size()));
+    std::set<double>::iterator itN = all_mpkil3.upper_bound(max_mpkil3);
+    all_mpkil3.erase(itN,all_mpkil3.end());
+    LOGINF("RRR Size after erase:{}"_format(all_mpkil3.size()));
+
 
 	// Calculate IQR = Q3 - Q1
 	int size = all_mpkil3.size();
@@ -1068,13 +1080,14 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	// Clear set
 	all_mpkil3.clear();
+	max_mpkil3 = 0;
 
     // Check if MPKI-L3 of each APP is 2 stds o more higher than the mean MPKI-L3
     for (const auto &item : v_mpkil3)
     {
     	double MPKIL3Task = std::get<1>(item);
-		if(MPKIL3Task > max_mpkil3)
-			max_mpkil3 = MPKIL3Task;
+		//if(MPKIL3Task > max_mpkil3)
+		//	max_mpkil3 = MPKIL3Task;
 
         pidTask = std::get<0>(item);
         int freqCritical = -1;
@@ -1106,6 +1119,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
             	outlier.push_back(std::make_pair(pidTask,1));
             	critical_apps += 1;
             	frequencyCritical[pidTask]++;
+				if((max_mpkil3 == 0) | (MPKIL3Task < max_mpkil3))
+					max_mpkil3 = MPKIL3Task;
+
         	}
         	else if((MPKIL3Task < limit_outlier) && (fractionCritical>=0.5))
         	{
