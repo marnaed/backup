@@ -162,12 +162,14 @@ class CriticalAwareV2: public LinuxBase
     uint64_t idle_count = IDLE_INTERVALS;
 
     // vector to store if task is assigned to critical CLOS
-    typedef std::tuple<pid_t, uint64_t> pair_t;
-	typedef std::tuple<pid_t, double> pairD_t;
+    typedef std::tuple<uint32_t, uint64_t> pair_t;
+	typedef std::tuple<uint32_t, double> pairD_t;
+	typedef std::tuple<uint32_t, pid_t> pair32P_t;
 	//std::set<double> all_mpkil3;
     std::vector<pair_t> taskIsInCRCLOS;
     std::vector<pair_t> pid_CPU;
 	std::vector<pairD_t> v_mpkil3_prev;
+	std::vector<pair32P_t> id_pid;
 
 	// number of times a task has been critical
     std::map<pid_t,uint64_t> frequencyCritical;
@@ -186,7 +188,7 @@ class CriticalAwareV2: public LinuxBase
 	//dictinary holding previous value of critical apps
 	std::map<pid_t, double> ipc_critical_prev;
 	bool false_critical_app = false;
-	pid_t excluded_application;
+	//uint32_t excluded_application;
 	double excluded_application_ipc;
 
 	// dictionary holding deque with 3 last MPKIL3 values for each task
