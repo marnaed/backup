@@ -87,7 +87,7 @@ def main():
         print(name)
         for policy in args.policies:
             if policy != args.defaultPolicy:
-                print(df["%gain"+policy].mean())
+                print('{}: {:.2f}'.format(policy,df["%gain"+policy].mean()))
         #print(df["%gainCAV2"].mean())
         print(" ")
 
