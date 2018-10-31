@@ -988,23 +988,23 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	{
 		// Get deque
 		std::deque<double> val = x.second;
-		idTask = x.first;
-		auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
+		//idTask = x.first;
+		//auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
 
 		// Only include values from non ciritcal apps
-		if((it2 != taskIsInCRCLOS.end()) && (std::get<1>(*it2) == 2))
-			LOGINF("Task {} is CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED");
-		else
+		//if((it2 != taskIsInCRCLOS.end()) && (std::get<1>(*it2) == 2))
+		//	LOGINF("Task {} is CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED");
+		//else
+		//{
+		// Add values
+		std::string res;
+		for (auto i = val.cbegin(); i != val.cend(); ++i)
 		{
-			// Add values
-			std::string res;
-			for (auto i = val.cbegin(); i != val.cend(); ++i)
-			{
-				res = res + std::to_string(*i) + " ";
-				all_mpkil3.insert(*i);
-			}
-			LOGINF(res);
+			res = res + std::to_string(*i) + " ";
+			all_mpkil3.insert(*i);
 		}
+		LOGINF(res);
+		//}
 	}
 
 	/*((current_interval > firstInterval) & (max_mpkil3 > 0))
@@ -1018,7 +1018,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	}*/
 
 	// Calculate IQR = Q3 - Q1
-	int size = all_mpkil3.size();
+	/*int size = all_mpkil3.size();
 	LOGINF("Size:{}, Q1 pos:{}, Q3 pos:{}"_format(size,size/4,size*0.75));
 	double Q1 = *std::next(all_mpkil3.begin(), size/4);
 	double Q3 = *std::next(all_mpkil3.begin(), size*0.75);
@@ -1027,6 +1027,21 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	// Calculate limit outlier
 	double limit_outlier = Q3 + (IQR * 1.5);
+    LOGINF("limit_outlier = {}"_format(limit_outlier));
+	*/
+
+	// Calculate limit outlier with Neil C. Schwetman's method
+	// 1. Establish error level
+	double Z = 1.96;
+	// 2. Get value of kn
+	uint64_t size = all_mpkil3.size();
+	LOGINF("Size:{}, 22 pos:{}, Q3 pos:{}"_format(size,size/2,size*0.75));
+	double kn = kn_table[size];
+	// 3. Calculate q2 and q3
+	double q2 = *std::next(all_mpkil3.begin(), size/2);
+	double q3 = *std::next(all_mpkil3.begin(), size*0.75);
+	// Calculate limit outlier
+    double limit_outlier = q2 + (((2 * (q3 - q2)) / kn) * Z);
     LOGINF("limit_outlier = {}"_format(limit_outlier));
 
 	// Clear set
@@ -1406,8 +1421,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                         if(ipcTotal > UP_limit_IPC)
                             idle = true;
                         else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            //state = 5;
-							idle = true;
+                            state = 5;
+							//idle = true;
                      	else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             state = 6;
                         else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
@@ -1420,8 +1435,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                         if(ipcTotal > UP_limit_IPC)
                             idle = true;
                         else if( (ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            //state = 8;
-							idle = true;
+                            state = 8;
+							//idle = true;
                         else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             state = 7;
                         else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
@@ -1434,8 +1449,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                         if(ipcTotal > UP_limit_IPC)
                             idle = true;
                         else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            //state = 5;
-							idle = true;
+                            state = 5;
+							//idle = true;
                         else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             state = 6;
                         else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
