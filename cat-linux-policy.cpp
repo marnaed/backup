@@ -1406,8 +1406,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                         if(ipcTotal > UP_limit_IPC)
                             idle = true;
                         else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            state = 5;
-							//idle = true;
+                            //state = 5;
+							idle = true;
                      	else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             state = 6;
                         else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
@@ -1420,8 +1420,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                         if(ipcTotal > UP_limit_IPC)
                             idle = true;
                         else if( (ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            state = 8;
-							//idle = true;
+                            //state = 8;
+							idle = true;
                         else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             state = 7;
                         else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
@@ -1434,8 +1434,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                         if(ipcTotal > UP_limit_IPC)
                             idle = true;
                         else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
-                            state = 5;
-							//idle = true;
+                            //state = 5;
+							idle = true;
                         else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             state = 6;
                         else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
