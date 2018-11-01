@@ -988,23 +988,23 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	{
 		// Get deque
 		std::deque<double> val = x.second;
-		//idTask = x.first;
-		//auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
+		idTask = x.first;
+		auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
 
 		// Only include values from non ciritcal apps
-		//if((it2 != taskIsInCRCLOS.end()) && (std::get<1>(*it2) == 2))
-		//	LOGINF("Task {} is CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED");
-		//else
-		//{
-		// Add values
-		std::string res;
-		for (auto i = val.cbegin(); i != val.cend(); ++i)
+		if((it2 != taskIsInCRCLOS.end()) && (std::get<1>(*it2) == 2))
+			LOGINF("Task {} is CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED");
+		else
 		{
-			res = res + std::to_string(*i) + " ";
-			all_mpkil3.insert(*i);
+			// Add values
+			std::string res;
+			for (auto i = val.cbegin(); i != val.cend(); ++i)
+			{
+				res = res + std::to_string(*i) + " ";
+				all_mpkil3.insert(*i);
+			}
+			LOGINF(res);
 		}
-		LOGINF(res);
-		//}
 	}
 
 	/*((current_interval > firstInterval) & (max_mpkil3 > 0))
@@ -1248,8 +1248,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		// Update configuration if there is a change in the number of critical apps
         if(change_in_outliers)
 		{
-			reset_configuration(tasklist);
-            //update_configuration(taskIsInCRCLOS, status,prev_critical_apps,critical_apps);
+			//reset_configuration(tasklist);
+            update_configuration(taskIsInCRCLOS, status,prev_critical_apps,critical_apps);
 		}
 		else
         {
