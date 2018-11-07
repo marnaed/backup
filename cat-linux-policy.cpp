@@ -665,7 +665,6 @@ void CriticalAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 	// Assign total IPC of this interval to previos value
     expectedIPCtotal = ipcTotal;
 
-
 }//apply
 
 
@@ -736,10 +735,12 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 		for (const auto &item : v)
 		{
 			uint32_t taskID = std::get<0>(item);
+			auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+            pid_t taskPID = std::get<1>(*it1);
 			uint64_t CLOS = std::get<1>(item);
 			if ((CLOS != 1) && (CLOS != 4))
 			{
-				LinuxBase::get_cat()->add_task(1,taskID);
+				LinuxBase::get_cat()->add_task(1,taskPID);
 				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
 				it2 = taskIsInCRCLOS.erase(it2);
 				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
@@ -920,7 +921,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			double insert_value;
 			if(deque_aux.size() == 3)
 			{
-				//LOGINF("{}: {} {} {}"_format(taskPID,deque_aux[0],deque_aux[1],deque_aux[2]));
+				LOGINF("{}: {} {} {}"_format(taskPID,deque_aux[0],deque_aux[1],deque_aux[2]));
 
 				// Check middle value is not a spike
 				if ((deque_aux[1] >= 2*deque_aux[0]) & (deque_aux[1] >= 2*deque_aux[2]))
@@ -940,6 +941,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 
 				// Add value to current mpkil3 vector
+				LOGINF("Task {} inserts value {} to v_mpkil3"_format(taskID,insert_value));
 				v_mpkil3.push_back(std::make_pair(taskID,insert_value));
 
 				// Add or update value to mpkil3_prev vector
@@ -990,22 +992,34 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		std::deque<double> val = x.second;
 		idTask = x.first;
 		auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
+		//auto it2 = std::find_if(outlier_prev.begin(), outlier_prev.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
+
+		std::string res;
 
 		// Only include values from non ciritcal apps
-		if((it2 != taskIsInCRCLOS.end()) && (std::get<1>(*it2) == 2))
-			LOGINF("Task {} is CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED");
+		// if((it2 != outlier_prev.end()) && (std::get<1>(*it2) == 1))
+		if((it2 != outlier_prev.end()) && (std::get<1>(*it2) == 2))
+		{
+			LOGINF("Task {} is CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED"_format(idTask));
+			for (auto i = val.cbegin(); i != val.cend(); ++i)
+            	res = res + std::to_string(*i) + " ";
+		}
 		else
 		{
 			// Add values
-			std::string res;
 			for (auto i = val.cbegin(); i != val.cend(); ++i)
 			{
 				res = res + std::to_string(*i) + " ";
+				//if(erase && (*i >= erase_value))
+				//	LOGINF("ERASE = TRUE --> {} > {} so not included"_format(*i, erase_value));
+				//else
 				all_mpkil3.insert(*i);
 			}
-			LOGINF(res);
 		}
+		LOGINF(res);
 	}
+
+	//erase = false;
 
 	/*((current_interval > firstInterval) & (max_mpkil3 > 0))
 	{
@@ -1123,10 +1137,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	{
 		// Then remove from all_mpkil3 the values greater than max_mpkil3
 		LOGINF("Number of intervals with no critical apps >= 5!!");
-		LOGINF("RRR Size before erase:{}"_format(all_mpkil3.size()));
-    	std::set<double>::iterator itN = all_mpkil3.upper_bound(max_mpkil3);
-		all_mpkil3.erase(itN,all_mpkil3.end());
-		LOGINF("RRR Size after erase:{}"_format(all_mpkil3.size()));
+		erase = true;
+		erase_value = q3;
+		num_no_critical = 0;
 	}*/
 
 	// If no previous configuration has been established (firstTime = true)
@@ -1432,6 +1445,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                         break;
 
                     case 5: case 6:
+
                         if(ipcTotal > UP_limit_IPC)
                             idle = true;
                         else if( (ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
@@ -1537,6 +1551,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	expectedIPCtotal = ipcTotal;
 	prev_critical_apps = critical_apps;
 	id_pid.clear();
+	outlier_prev = outlier;
 
 }//end apply
 
