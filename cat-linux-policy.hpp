@@ -167,6 +167,7 @@ class CriticalAwareV2: public LinuxBase
 	typedef std::tuple<uint32_t, pid_t> pair32P_t;
 	//std::set<double> all_mpkil3;
     std::vector<pair_t> taskIsInCRCLOS;
+	std::vector<pair_t> outlier_prev;
     std::vector<pair_t> pid_CPU;
 	std::vector<pairD_t> v_mpkil3_prev;
 	std::vector<pair32P_t> id_pid;
@@ -180,8 +181,31 @@ class CriticalAwareV2: public LinuxBase
         { 3, 0x00003 }
     };
 
+	//bool erase = false;
+	//double erase_value;
+
 	// Table with values of Kn
 	std::map<uint64_t, double> kn_table = {
+		{ 30, 1.3377 },
+		{ 31, 1.38876 },
+		{ 32, 1.34004 },
+		{ 33, 1.38799 },
+		{ 34, 1.33909 },
+		{ 35, 1.38428 },
+		{ 36, 1.34092 },
+		{ 37, 1.38367 },
+		{ 38, 1.34017 },
+		{ 39, 1.38071 },
+		{ 40, 1.34165 },
+		{ 41, 1.38021 },
+		{ 42, 1.34104 },
+		{ 43, 1.37779 },
+		{ 44, 1.34226 },
+		{ 45, 1.37737 },
+		{ 46, 1.34175 },
+		{ 47, 1.37536 },
+		{ 48, 1.34278 },
+		{ 49, 1.37501 },
 		{ 50, 1.34235 },
 		{ 51, 1.37331 },
 		{ 52, 1.34322 },
