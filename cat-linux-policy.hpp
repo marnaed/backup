@@ -138,6 +138,7 @@ class CriticalAwareV2: public LinuxBase
 	protected:
     uint64_t every = -1;
     uint64_t firstInterval = 1;
+	uint64_t windowSize = 4;
 
     // Masks of CLOS
     uint64_t maskCrCLOS = 0xfffff;
@@ -186,6 +187,31 @@ class CriticalAwareV2: public LinuxBase
 
 	// Table with values of Kn
 	std::map<uint64_t, double> kn_table = {
+		{ 5, 1.65798 },
+		{ 6, 1.28351 },
+		{ 7, 1.51475 },
+		{ 8, 1.32505 },
+		{ 9, 1.50427 },
+		{ 10, 1.31212 },
+		{ 11, 1.45768 },
+		{ 12, 1.32968 },
+		{ 13, 1.45268 },
+		{ 14, 1.32353 },
+		{ 15, 1.42975 },
+		{ 16, 1.33318 },
+		{ 17, 1.42684 },
+		{ 18, 1.32959 },
+		{ 19, 1.41322 },
+		{ 20, 1.33568 },
+		{ 21, 1.41132 },
+		{ 22, 1.33333 },
+		{ 23, 1.4023 },
+		{ 24, 1.33753 },
+		{ 25, 1.40096 },
+		{ 26, 1.33587 },
+		{ 27, 1.39455 },
+		{ 28, 1.33894 },
+		{ 29, 1.39355 },
 		{ 30, 1.3377 },
 		{ 31, 1.38876 },
 		{ 32, 1.34004 },
@@ -261,7 +287,7 @@ class CriticalAwareV2: public LinuxBase
 
     public:
 
-	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval) : every(_every), firstInterval(_firstInterval) {}
+	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval, uint64_t _windowSize) : every(_every), firstInterval(_firstInterval), windowSize(_windowSize) {}
 
     virtual ~CriticalAwareV2() = default;
 

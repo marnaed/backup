@@ -913,7 +913,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			std::deque<double> deque_aux = it->second;
 			std::deque<double> deque_valid = it2->second;
 			// Remove one value if size is equal to sliding window size
-			if (deque_valid.size() == 10)
+			if (deque_valid.size() == windowSize)
 				deque_valid.pop_back();
 
 			deque_aux.push_front(MPKIL3);

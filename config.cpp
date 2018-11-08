@@ -88,7 +88,7 @@ std::shared_ptr<cat::policy::Base> config_read_cat_policy(const YAML::Node &conf
         LOGINF("Using Critical-Aware V2 (cav2) CAT policy");
 
         // Check that required fields exist
-        for (string field : {"every", "firstInterval"})
+        for (string field : {"every", "firstInterval", "windowSize"})
         {
             if (!policy[field])
                 throw_with_trace(std::runtime_error("The '" + kind + "' CAT policy needs the '" + field + "' field"));
@@ -96,8 +96,9 @@ std::shared_ptr<cat::policy::Base> config_read_cat_policy(const YAML::Node &conf
         // Read fields
         uint64_t every = policy["every"].as<uint64_t>();
         uint64_t firstInterval = policy["firstInterval"].as<uint64_t>();
+		uint64_t windowSize = policy["windowSize"].as<uint64_t>();
 
-        return std::make_shared<cat::policy::CriticalAwareV2>(every, firstInterval);
+        return std::make_shared<cat::policy::CriticalAwareV2>(every, firstInterval, windowSize);
     }
 	else if (kind == "np")
 	{
