@@ -735,9 +735,12 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 		for (const auto &item : v)
 		{
 			uint32_t taskID = std::get<0>(item);
+			uint64_t CLOS = std::get<1>(item);
+
+			// Find PID corresponding to the ID
 			auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
             pid_t taskPID = std::get<1>(*it1);
-			uint64_t CLOS = std::get<1>(item);
+
 			if ((CLOS != 1) && (CLOS != 4))
 			{
 				LinuxBase::get_cat()->add_task(1,taskPID);
@@ -834,19 +837,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     if (current_interval % every != 0)
     	return;
 
-    // Check if current interval must be left idle
-	if(idle)
-    {
-    	LOGINF("Idle interval {}"_format(idle_count));
-        idle_count = idle_count - 1;
-        if(idle_count == 0)
-        {
-        	idle = false;
-            idle_count = IDLE_INTERVALS;
-        }
-        return;
-    }
-
 	/** LOCAL VARIABLES DECLARATION**/
     // (uint32_t, double) vectors of tuples
     auto v_ipc = std::vector<pairD_t>();
@@ -921,12 +911,13 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			double insert_value;
 			if(deque_aux.size() == 3)
 			{
-				LOGINF("{}: {} {} {}"_format(taskPID,deque_aux[0],deque_aux[1],deque_aux[2]));
+				LOGINF("{}: {} {} {}"_format(taskID,deque_aux[0],deque_aux[1],deque_aux[2]));
 
 				// Check middle value is not a spike
-				if ((deque_aux[1] >= 2*deque_aux[0]) & (deque_aux[1] >= 2*deque_aux[2]))
+				if (((deque_aux[1] >= 2*deque_aux[0]) & (deque_aux[1] >= 2*deque_aux[2])) | ((deque_aux[1] <= 0.5*deque_aux[0]) & (deque_aux[1] <= 0.5*deque_aux[2])))
 				{
 					// Middle value is a spike -> remove middle value and insert last value to all_mpkil3
+					LOGINF("{}: SPIKE VALUE DETECTED!!"_format(taskID));
 					insert_value = deque_aux[2];
 					deque_valid.push_front(insert_value);
 					deque_aux.pop_back(); //remove value 2
@@ -934,6 +925,25 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				else
 				{
+					auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+					if((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
+					{
+						if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= 0.5*deque_aux[1]))
+						{
+							LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
+							phase_count[taskID] += 1;
+							phase_duration[taskID] = 0;
+						}
+						else
+							phase_duration[taskID] += 1;
+
+					}
+					//else if ((deque_aux[1] >= 2*deque_aux[2]) | (deque_aux[1] <= 0.5*deque_aux[2]))
+					//{
+					//	LOGINF("{}: PHASE {} ENDING"_format(taskID, phase_count[taskID]));
+					//	phase_count[taskID] += 1;
+					//}
+
 					// Middle value is not a spike value
 					insert_value = deque_aux[2];
 					deque_valid.push_front(insert_value);
@@ -972,6 +982,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			LOGINF("NEW ENTRY IN DICTS deque_mpkil3 and valid_mpkil3 added");
             deque_mpkil3[taskID].push_front(MPKIL3);
 			valid_mpkil3[taskID] = std::deque<double>();
+			phase_count[taskID] = 1;
+			phase_duration[taskID] = 0;
 
 			// Add in vector in case this apps has been restarted
 			v_mpkil3.push_back(std::make_pair(taskID,MPKIL3));
@@ -983,7 +995,42 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	// Perform no further action if cache-warmup time has not passed
     if (current_interval < firstInterval)
+	{
+		id_pid.clear();
 		return;
+	}
+
+	// Check if current interval must be left idle
+    if(idle)
+    {
+        LOGINF("Idle interval {}"_format(idle_count));
+
+		for (const auto &item : taskIsInCRCLOS)
+      	{
+          	idTask = std::get<0>(item);
+			auto itIPC = std::find_if(v_ipc.begin(), v_ipc.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
+            double ipcTask = std::get<1>(*itIPC);
+			if(std::get<1>(item) == 1)
+				ipc_CR += ipcTask;
+			else if(std::get<1>(item) == 2)
+				ipc_CR += ipcTask;
+		}
+
+		ipc_CR_prev = ipc_CR;
+      	ipc_NCR_prev = ipc_NCR;
+
+      	// Assign total IPC of this interval to previos value
+      	expectedIPCtotal = ipcTotal;
+      	id_pid.clear();
+
+        idle_count = idle_count - 1;
+        if(idle_count == 0)
+        {
+            idle = false;
+            idle_count = IDLE_INTERVALS;
+        }
+        return;
+    }
 
 	// Add values of MPKI-L3 from each app to the set
 	for (auto const &x : valid_mpkil3)
@@ -998,7 +1045,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 		// Only include values from non ciritcal apps
 		// if((it2 != outlier_prev.end()) && (std::get<1>(*it2) == 1))
-		if((it2 != outlier_prev.end()) && (std::get<1>(*it2) == 2))
+		if((it2 != taskIsInCRCLOS.end()) && (std::get<1>(*it2) == 2))
 		{
 			LOGINF("Task {} is CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED"_format(idTask));
 			for (auto i = val.cbegin(); i != val.cend(); ++i)
