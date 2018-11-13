@@ -278,9 +278,11 @@ class CriticalAwareV2: public LinuxBase
 	double excluded_application_ipc;
 
 	// dictionary holding deque with 3 last MPKIL3 values for each task
-	std::map<pid_t, std::deque<double>> deque_mpkil3;
+	std::map<uint32_t, std::deque<double>> deque_mpkil3;
 	// dictionary holding up to 10 last MPKIL3 valid (non-spike) values
-	std::map<pid_t, std::deque<double>> valid_mpkil3;
+	std::map<uint32_t, std::deque<double>> valid_mpkil3;
+	std::map<uint32_t, uint64_t> phase_count;
+	std::map<uint32_t, uint64_t> phase_duration;
 
 	// number of times consecutive critical_apps = 0 detected
 	uint64_t num_no_critical = 0;
