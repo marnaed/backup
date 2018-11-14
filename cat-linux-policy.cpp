@@ -902,10 +902,12 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		{
 			std::deque<double> deque_aux = it->second;
 			std::deque<double> deque_valid = it2->second;
-			// Remove one value if size is equal to sliding window size
-			if (deque_valid.size() == windowSize)
+
+			// Remove values until vector  size is equal to sliding window size
+			while (deque_valid.size() >= windowSize)
 				deque_valid.pop_back();
 
+			// Add new value
 			deque_aux.push_front(MPKIL3);
 
 			double insert_value;
@@ -926,23 +928,32 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				else
 				{
 					auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
-					if((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
-					{
-						if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= 0.5*deque_aux[1]))
-						{
-							LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
-							phase_count[taskID] += 1;
-							phase_duration[taskID] = 0;
-						}
-						else
-							phase_duration[taskID] += 1;
 
+					// Check if its last value is a spike value
+	                // Which means a new phase in comming
+					if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= deque_aux[1]/2))
+					{
+						// If it is not the first phase
+						if(phase_count[taskID] > 1)
+						{
+							// Check if application is a critical application
+                         	if((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
+							{
+								LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
+
+								if(phase_duration[taskID] > 10)
+									windowSize = 10;
+								else if(phase_duration[taskID] >= 2)
+									windowSize = phase_duration[taskID];
+								LOGINF("New windowSize = {}"_format(windowSize));
+							}
+
+						}
+						phase_count[taskID] += 1;
+						phase_duration[taskID] = 0;
 					}
-					//else if ((deque_aux[1] >= 2*deque_aux[2]) | (deque_aux[1] <= 0.5*deque_aux[2]))
-					//{
-					//	LOGINF("{}: PHASE {} ENDING"_format(taskID, phase_count[taskID]));
-					//	phase_count[taskID] += 1;
-					//}
+					else
+						phase_duration[taskID] += 1;
 
 					// Middle value is not a spike value
 					insert_value = deque_aux[2];
@@ -961,7 +972,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                 else
                     std::get<1>(*it_pm) = insert_value;
 
-
 			}
 			else if(current_interval >= firstInterval)
 			{
@@ -969,6 +979,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
               	if(it_pm != v_mpkil3_prev.end())
 					v_mpkil3.push_back(std::make_pair(taskID,std::get<1>(*it_pm)));
+
+				phase_duration[taskID] += 1;
 
 			}
 
@@ -1044,7 +1056,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		std::string res;
 
 		// Only include values from non ciritcal apps
-		// if((it2 != outlier_prev.end()) && (std::get<1>(*it2) == 1))
 		if((it2 != taskIsInCRCLOS.end()) && (std::get<1>(*it2) == 2))
 		{
 			LOGINF("Task {} is CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED"_format(idTask));
@@ -1057,39 +1068,11 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			for (auto i = val.cbegin(); i != val.cend(); ++i)
 			{
 				res = res + std::to_string(*i) + " ";
-				//if(erase && (*i >= erase_value))
-				//	LOGINF("ERASE = TRUE --> {} > {} so not included"_format(*i, erase_value));
-				//else
 				all_mpkil3.insert(*i);
 			}
 		}
 		LOGINF(res);
 	}
-
-	//erase = false;
-
-	/*((current_interval > firstInterval) & (max_mpkil3 > 0))
-	{
-		// Remove all values greater than limit outlier
-		LOGINF("Max. MPKIL3 of previous interval {}"_format(max_mpkil3));
-    	LOGINF("RRR Size before erase:{}"_format(all_mpkil3.size()));
-    	std::set<double>::iterator itN = all_mpkil3.upper_bound(max_mpkil3);
-   	 	all_mpkil3.erase(itN,all_mpkil3.end());
-    	LOGINF("RRR Size after erase:{}"_format(all_mpkil3.size()));
-	}*/
-
-	// Calculate IQR = Q3 - Q1
-	/*int size = all_mpkil3.size();
-	LOGINF("Size:{}, Q1 pos:{}, Q3 pos:{}"_format(size,size/4,size*0.75));
-	double Q1 = *std::next(all_mpkil3.begin(), size/4);
-	double Q3 = *std::next(all_mpkil3.begin(), size*0.75);
-	double IQR = Q3 - Q1;
-	LOGINF("Q1 = {}  |||  Q3 ={}"_format(Q1,Q3));
-
-	// Calculate limit outlier
-	double limit_outlier = Q3 + (IQR * 1.5);
-    LOGINF("limit_outlier = {}"_format(limit_outlier));
-	*/
 
 	// Calculate limit outlier with Neil C. Schwetman's method
 	// 1. Establish error level
@@ -1551,25 +1534,27 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						case 5:
 							LOGINF("NCR-- (Remove one shared way from CLOS with non-critical apps)");
 							maskNonCrCLOS = (maskNonCrCLOS >> 1) & maskNonCrCLOS;
+							if((maskNonCrCLOS == 0x00001) | (maskNonCrCLOS == 0x00000))
+								maskNonCrCLOS = 0x00002;
 							assert(maskNonCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							break;
 						case 6:
 							LOGINF("CR-- (Remove one shared way from CLOS with critical apps)");
 							maskCrCLOS = (maskCrCLOS << 1) & maskCrCLOS;
+							if((maskCrCLOS == 0x00001) | (maskCrCLOS == 0x00000))
+                            	maskCrCLOS = 0x00002;
 							assert(maskCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 							break;
 						case 7:
 							LOGINF("NCR++ (Add one shared way to CLOS with non-critical apps)");
 							maskNonCrCLOS = (maskNonCrCLOS << 1) | maskNonCrCLOS;
-							assert(maskNonCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							break;
 						case 8:
 							LOGINF("CR++ (Add one shared way to CLOS with critical apps)");
 							maskCrCLOS = (maskCrCLOS >> 1) | maskCrCLOS;
-							assert(maskCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 							break;
 						default:
