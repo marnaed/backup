@@ -168,7 +168,6 @@ class CriticalAwareV2: public LinuxBase
 	typedef std::tuple<uint32_t, pid_t> pair32P_t;
 	//std::set<double> all_mpkil3;
     std::vector<pair_t> taskIsInCRCLOS;
-	std::vector<pair_t> outlier_prev;
     std::vector<pair_t> pid_CPU;
 	std::vector<pairD_t> v_mpkil3_prev;
 	std::vector<pair32P_t> id_pid;

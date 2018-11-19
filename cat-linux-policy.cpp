@@ -910,6 +910,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			// Add new value
 			deque_aux.push_front(MPKIL3);
 
+			// Increment phase duration counter
+			phase_duration[taskID] += 1;
+
 			double insert_value;
 			if(deque_aux.size() == 3)
 			{
@@ -924,6 +927,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					deque_valid.push_front(insert_value);
 					deque_aux.pop_back(); //remove value 2
 					deque_aux.pop_back(); //remove value 1
+					phase_duration[taskID] -= 1;
 				}
 				else
 				{
@@ -939,21 +943,19 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 							// Check if application is a critical application
                          	if((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
 							{
-								LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
+								 LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID],phase_duration[taskID]));
 
 								if(phase_duration[taskID] > 10)
 									windowSize = 10;
 								else if(phase_duration[taskID] >= 2)
 									windowSize = phase_duration[taskID];
-								LOGINF("New windowSize = {}"_format(windowSize));
+								LOGINF("{}: New windowSize = {}"_format(taskID, windowSize));
 							}
 
 						}
 						phase_count[taskID] += 1;
 						phase_duration[taskID] = 0;
 					}
-					else
-						phase_duration[taskID] += 1;
 
 					// Middle value is not a spike value
 					insert_value = deque_aux[2];
@@ -979,8 +981,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
               	if(it_pm != v_mpkil3_prev.end())
 					v_mpkil3.push_back(std::make_pair(taskID,std::get<1>(*it_pm)));
-
-				phase_duration[taskID] += 1;
 
 			}
 
@@ -1022,8 +1022,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
           	idTask = std::get<0>(item);
 			auto itIPC = std::find_if(v_ipc.begin(), v_ipc.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
             double ipcTask = std::get<1>(*itIPC);
+
 			if(std::get<1>(item) == 1)
-				ipc_CR += ipcTask;
+				ipc_NCR += ipcTask;
 			else if(std::get<1>(item) == 2)
 				ipc_CR += ipcTask;
 		}
@@ -1051,7 +1052,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		std::deque<double> val = x.second;
 		idTask = x.first;
 		auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
-		//auto it2 = std::find_if(outlier_prev.begin(), outlier_prev.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
 
 		std::string res;
 
@@ -1076,10 +1076,10 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	// Calculate limit outlier with Neil C. Schwetman's method
 	// 1. Establish error level
-	double Z = 1.96;
+	double Z = 1.96; //95%
 	// 2. Get value of kn
 	uint64_t size = all_mpkil3.size();
-	LOGINF("Size:{}, 22 pos:{}, Q3 pos:{}"_format(size,size/2,size*0.75));
+	LOGINF("Size:{}, Q2 pos:{}, Q3 pos:{}"_format(size,size/2,size*0.75));
 	double kn = kn_table[size];
 	// 3. Calculate q2 and q3
 	double q2 = *std::next(all_mpkil3.begin(), size/2);
@@ -1090,7 +1090,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	// Clear set
 	all_mpkil3.clear();
-	max_mpkil3 = 0;
 
     // Check if MPKI-L3 of each APP is 2 stds o more higher than the mean MPKI-L3
     for (const auto &item : v_mpkil3)
@@ -1127,9 +1126,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
             	outlier.push_back(std::make_pair(idTask,1));
             	critical_apps += 1;
             	frequencyCritical[idTask]++;
-				// Store the minimum value of the MPKI-L3 from the critical apps
-				if((max_mpkil3 == 0) | (MPKIL3Task < max_mpkil3))
-					max_mpkil3 = MPKIL3Task;
 
         	}
         	else if((MPKIL3Task < limit_outlier) && (fractionCritical>=0.5))
@@ -1583,7 +1579,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	expectedIPCtotal = ipcTotal;
 	prev_critical_apps = critical_apps;
 	id_pid.clear();
-	outlier_prev = outlier;
 
 }//end apply
 
