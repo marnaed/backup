@@ -675,20 +675,8 @@ void CriticalAwareV2::reset_configuration(const tasklist_t &tasklist)
     for (const auto &task_ptr : tasklist)
     {
         const Task &task = *task_ptr;
-        uint32_t taskID = task.id;
-		pid_t taskPID = task.pid;
-
-		// Assign all tasks to CLOS 1
+        pid_t taskPID = task.pid;
         LinuxBase::get_cat()->add_task(1,taskPID);
-
-		// clear valid data
-		auto it2 = valid_mpkil3.find(taskID);
-        if(it2 != valid_mpkil3.end())
-		{
-        	std::deque<double> deque_valid = it2->second;
-			deque_valid.clear();
-			valid_mpkil3[taskID] = deque_valid;
-		}
     }
 
 	taskIsInCRCLOS.clear();
@@ -713,9 +701,6 @@ void CriticalAwareV2::reset_configuration(const tasklist_t &tasklist)
 
     idle = false;
     idle_count = IDLE_INTERVALS;
-
-	prev_critical_apps = 0;
-    id_pid.clear();
 
     LOGINF("Reset performed. Original configuration restored");
 }
@@ -833,7 +818,6 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 		default:
 			break;
 	}
-
 	LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 	LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 	num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
@@ -976,21 +960,11 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 							{
 								 LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID],phase_duration[taskID]));
 
-								if(!modified_ws)
-								{
-									if(phase_duration[taskID] > 10)
-										windowSize = 10;
-									else if(phase_duration[taskID] >= 2)
-										windowSize = phase_duration[taskID];
-								}
-								else
-								{
-									if((phase_duration[taskID] < 10) & (phase_duration[taskID] < windowSize))
-										windowSize = phase_duration[taskID];
-								}
-
+								if(phase_duration[taskID] > 10)
+									windowSize = 10;
+								else if(phase_duration[taskID] >= 2)
+									windowSize = phase_duration[taskID];
 								LOGINF("{}: New windowSize = {}"_format(taskID, windowSize));
-								modified_ws = true;
 							}
 						}
 						phase_count[taskID] += 1;
@@ -1123,34 +1097,19 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		LOGINF(res);
 	}
 
-	reset = false;
-
+	// Calculate limit outlier with Neil C. Schwetman's method
+	// 1. Establish error level
+	double Z = 1.96; //95%
+	// 2. Get value of kn
 	uint64_t size = all_mpkil3.size();
-	LOGINF("Size:{}, Q1 pos:{}, Q2 pos:{}, Q3 pos:{}"_format(size,size/4,size/2,size*0.75));
-	double q1 = *std::next(all_mpkil3.begin(), size/4);
+	LOGINF("Size:{}, Q2 pos:{}, Q3 pos:{}"_format(size,size/2,size*0.75));
+	double kn = kn_table[size];
+	// 3. Calculate q2 and q3
 	double q2 = *std::next(all_mpkil3.begin(), size/2);
 	double q3 = *std::next(all_mpkil3.begin(), size*0.75);
-	double limit_outlier;
-
-	if(outlierMethod == "Schwetman")
-	{
-		// Calculate limit outlier with Neil C. Schwetman's method
-		double Z = 1.96; //95%
-		double kn = kn_table[size];
-    	limit_outlier = q2 + (((2 * (q3 - q2)) / kn) * Z);
-	}
-	else if(outlierMethod == "Carling")
-	{
-		// Calculate limit outlier with Carling's method
-	    double k = ((17.63 * size) - 23.64) / ((7.74 * size) - 3.71);
-		limit_outlier = q2 + (k * (q3 - q1));
-	    LOGINF("k = {}"_format(k));
-	}
-	else if(outlierMethod == "Turkey")
-	{
-		limit_outlier = q3 + (1.5 * (q3 - q1));
-	}
-	LOGINF("limit_outlier = {}"_format(limit_outlier));
+	// Calculate limit outlier
+    double limit_outlier = q2 + (((2 * (q3 - q2)) / kn) * Z);
+    LOGINF("limit_outlier = {}"_format(limit_outlier));
 
 	// Clear set
 	all_mpkil3.clear();
@@ -1221,7 +1180,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	LOGINF("CR apps: {}"_format(res));
 
 	// Keep count of consecutive intervals no critical apps are detected
-	if ((critical_apps == 0) | (critical_apps >= 4))
+	/*if (critical_apps == 0)
 		num_no_critical += 1;
 	//else
 	//	num_no_critical = 0;
@@ -1230,12 +1189,15 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	if(num_no_critical >= 5)
 	{
 		// Then remove from all_mpkil3 the values greater than max_mpkil3
-		LOGINF("Number of intervals with no critical apps >= 5!! -> RESET");
+		LOGINF("Number of intervals with no critical apps >= 5!!");
+		erase = true;
+		erase_value = q3;
 		num_no_critical = 0;
 		reset = true;
 		//reset_configuration(tasklist);
 		return;
 	}
+	}*/
 
 	// If no previous configuration has been established (firstTime = true)
     if (firstTime)
@@ -1628,8 +1590,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
 					num_ways_CLOS_2 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(2));
 
-					LOGINF("CLOS 2 (CR)     has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
-					LOGINF("CLOS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
+					LOGINF("COS 2 (CR)     has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
+					LOGINF("COS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
 
 					int64_t aux_ns = (num_ways_CLOS_2 + num_ways_CLOS_1) - 20;
 					num_shared_ways = (aux_ns < 0) ? 0 : aux_ns;

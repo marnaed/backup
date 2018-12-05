@@ -139,7 +139,6 @@ class CriticalAwareV2: public LinuxBase
     uint64_t every = -1;
     uint64_t firstInterval = 1;
 	uint64_t windowSize = 4;
-	std::string outlierMethod = "Schwetman";
 
 	bool modified_ws = false;
 
@@ -314,7 +313,7 @@ class CriticalAwareV2: public LinuxBase
 
     public:
 
-	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval, uint64_t _windowSize, std::string _outlierMethod) : every(_every), firstInterval(_firstInterval), windowSize(_windowSize), outlierMethod(_outlierMethod) {}
+	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval, uint64_t _windowSize) : every(_every), firstInterval(_firstInterval), windowSize(_windowSize) {}
 
     virtual ~CriticalAwareV2() = default;
 
