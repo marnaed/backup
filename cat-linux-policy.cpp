@@ -709,6 +709,8 @@ void CriticalAwareV2::reset_configuration(const tasklist_t &tasklist)
 
     num_shared_ways = 0;
 
+	modified_ws = false;
+
     idle = false;
     idle_count = IDLE_INTERVALS;
 
@@ -923,6 +925,13 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			while (deque_valid.size() >= windowSize)
 				deque_valid.pop_back();
 
+			if(clear_mpkil3[taskID])
+			{
+				deque_valid.clear();
+				LOGINF("YYYYYYY");
+				clear_mpkil3[taskID] = 0;
+			}
+
 			// Add new value
 			deque_aux.push_front(MPKIL3);
 
@@ -949,9 +958,15 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
 
+					if(deque_aux[2] >= 2*deque_aux[1])
+					{
+						if((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
+							clear_mpkil3[taskID] = 1;
+
+					}
 					// Check if its last value is a spike value
 	                // Which means a new phase in comming
-					if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= deque_aux[1]/2))
+					else if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= deque_aux[1]/2))
 					{
 						// If it is not the first phase
 						if(phase_count[taskID] > 1)
@@ -961,13 +976,22 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 							{
 								 LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID],phase_duration[taskID]));
 
-								/*if(phase_duration[taskID] > 10)
-									windowSize = 10;
-								else if(phase_duration[taskID] >= 2)
-									windowSize = phase_duration[taskID];
-								LOGINF("{}: New windowSize = {}"_format(taskID, windowSize));*/
-							}
+								if(!modified_ws)
+								{
+									if(phase_duration[taskID] > 10)
+										windowSize = 10;
+									else if(phase_duration[taskID] >= 2)
+										windowSize = phase_duration[taskID];
+								}
+								else
+								{
+									if((phase_duration[taskID] < 10) & (phase_duration[taskID] < windowSize))
+										windowSize = phase_duration[taskID];
+								}
 
+								LOGINF("{}: New windowSize = {}"_format(taskID, windowSize));
+								modified_ws = true;
+							}
 						}
 						phase_count[taskID] += 1;
 						phase_duration[taskID] = 0;
@@ -1020,6 +1044,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	}
 	LOGINF("Total L3 occupation: {}"_format(l3_occup_mb_total));
 	assert(l3_occup_mb_total > 0);
+
+	modified_ws = false;
 
 	// Perform no further action if cache-warmup time has not passed
     if (current_interval < firstInterval)
@@ -1078,6 +1104,13 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			for (auto i = val.cbegin(); i != val.cend(); ++i)
             	res = res + std::to_string(*i) + " ";
 		}
+		else if((reset) & (non_critical[idTask] == 0))
+		{
+			LOGINF("RESET -> Task {} has bee CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED"_format(idTask));
+			for (auto i = val.cbegin(); i != val.cend(); ++i)
+                  res = res + std::to_string(*i) + " ";
+
+		}
 		else
 		{
 			// Add values
@@ -1089,6 +1122,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		}
 		LOGINF(res);
 	}
+
+	reset = false;
 
 	uint64_t size = all_mpkil3.size();
 	LOGINF("Size:{}, Q1 pos:{}, Q2 pos:{}, Q3 pos:{}"_format(size,size/4,size/2,size*0.75));
@@ -1120,6 +1155,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	// Clear set
 	all_mpkil3.clear();
 
+	std::string res;
     // Check if MPKI-L3 of each APP is 2 stds o more higher than the mean MPKI-L3
     for (const auto &item : v_mpkil3)
     {
@@ -1132,7 +1168,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		// Do not consider excluded_application
 		if(1)
 		{
-
         	if(current_interval > firstInterval)
         	{
             	// Search for mi tuple and update the value
@@ -1153,8 +1188,10 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         	{
             	LOGINF("The MPKI_L3 of task with id {} is an outlier, since {} >= {}"_format(idTask,MPKIL3Task,limit_outlier));
             	outlier.push_back(std::make_pair(idTask,1));
+				non_critical[idTask] = 0;
             	critical_apps += 1;
             	frequencyCritical[idTask]++;
+				res += std::to_string(idTask) + " ";
 
         	}
         	else if((MPKIL3Task < limit_outlier) && (fractionCritical>=0.5))
@@ -1163,6 +1200,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
             	LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask, fractionCritical));
             	outlier.push_back(std::make_pair(idTask,1));
             	critical_apps += 1;
+				res += std::to_string(idTask) + " ";
         	}
         	else
         	{
@@ -1180,12 +1218,13 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     } // End for loop
 
     LOGINF("critical_apps = {}"_format(critical_apps));
+	LOGINF("CR apps: {}"_format(res));
 
 	// Keep count of consecutive intervals no critical apps are detected
-	if (critical_apps == 0)
+	if ((critical_apps == 0) | (critical_apps >= 4))
 		num_no_critical += 1;
-	else
-		num_no_critical = 0;
+	//else
+	//	num_no_critical = 0;
 
 	// If during 5 or more consecutive intervals no critical apps are detected
 	if(num_no_critical >= 5)
@@ -1193,7 +1232,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		// Then remove from all_mpkil3 the values greater than max_mpkil3
 		LOGINF("Number of intervals with no critical apps >= 5!! -> RESET");
 		num_no_critical = 0;
-		reset_configuration(tasklist);
+		reset = true;
+		//reset_configuration(tasklist);
 		return;
 	}
 

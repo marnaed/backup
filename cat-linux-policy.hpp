@@ -141,6 +141,8 @@ class CriticalAwareV2: public LinuxBase
 	uint64_t windowSize = 4;
 	std::string outlierMethod = "Schwetman";
 
+	bool modified_ws = false;
+
     // Masks of CLOS
     uint64_t maskCrCLOS = 0xfffff;
     uint64_t num_ways_CLOS_2 = 20;
@@ -182,8 +184,31 @@ class CriticalAwareV2: public LinuxBase
         { 3, 0x00003 }
     };
 
-	//bool erase = false;
-	//double erase_value;
+	bool reset = false;
+
+	std::map<uint64_t, double> non_critical = {
+          { 0, 1 },
+          { 1, 1 },
+          { 2, 1 },
+          { 3, 1 },
+          { 4, 1 },
+          { 5, 1 },
+          { 6, 1 },
+          { 7, 1 }
+	};
+
+	std::map<uint64_t, double> clear_mpkil3 = {
+		{ 0, 0 },
+        { 1, 0 },
+        { 2, 0 },
+        { 3, 0 },
+        { 4, 0 },
+        { 5, 0 },
+        { 6, 0 },
+        { 7, 0 }
+     };
+
+
 
 	// Table with values of Kn
 	std::map<uint64_t, double> kn_table = {
