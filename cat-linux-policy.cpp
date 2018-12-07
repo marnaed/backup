@@ -697,8 +697,6 @@ void CriticalAwareV2::reset_configuration(const tasklist_t &tasklist)
 
     num_shared_ways = 0;
 
-	modified_ws = false;
-
     idle = false;
     idle_count = IDLE_INTERVALS;
 
@@ -912,7 +910,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			if(clear_mpkil3[taskID])
 			{
 				deque_valid.clear();
-				LOGINF("YYYYYYY");
+				LOGINF("{}: deque_valid has been clear as a new phase with lower values is starting."_format(taskID));
 				clear_mpkil3[taskID] = 0;
 			}
 
@@ -942,12 +940,10 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
 
-					if(deque_aux[2] >= 2*deque_aux[1])
-					{
-						if((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
-							clear_mpkil3[taskID] = 1;
+					// To remove previous values if new phase has smaller values
+					if((deque_aux[2] >= 2*deque_aux[1]) & (itX != taskIsInCRCLOS.end()))
+						clear_mpkil3[taskID] = 1;
 
-					}
 					// Check if its last value is a spike value
 	                // Which means a new phase in comming
 					else if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= deque_aux[1]/2))
@@ -1018,8 +1014,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	}
 	LOGINF("Total L3 occupation: {}"_format(l3_occup_mb_total));
 	assert(l3_occup_mb_total > 0);
-
-	modified_ws = false;
 
 	// Perform no further action if cache-warmup time has not passed
     if (current_interval < firstInterval)
@@ -1096,6 +1090,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		}
 		LOGINF(res);
 	}
+
+	reset = false;
 
 	// Calculate limit outlier with Neil C. Schwetman's method
 	// 1. Establish error level
@@ -1180,7 +1176,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	LOGINF("CR apps: {}"_format(res));
 
 	// Keep count of consecutive intervals no critical apps are detected
-	/*if (critical_apps == 0)
+	if ((critical_apps == 0) | (critical_apps == 4))
 		num_no_critical += 1;
 	//else
 	//	num_no_critical = 0;
@@ -1190,14 +1186,11 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	{
 		// Then remove from all_mpkil3 the values greater than max_mpkil3
 		LOGINF("Number of intervals with no critical apps >= 5!!");
-		erase = true;
-		erase_value = q3;
 		num_no_critical = 0;
 		reset = true;
 		//reset_configuration(tasklist);
 		return;
 	}
-	}*/
 
 	// If no previous configuration has been established (firstTime = true)
     if (firstTime)

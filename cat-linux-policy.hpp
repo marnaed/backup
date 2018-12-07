@@ -140,8 +140,6 @@ class CriticalAwareV2: public LinuxBase
     uint64_t firstInterval = 1;
 	uint64_t windowSize = 4;
 
-	bool modified_ws = false;
-
     // Masks of CLOS
     uint64_t maskCrCLOS = 0xfffff;
     uint64_t num_ways_CLOS_2 = 20;
