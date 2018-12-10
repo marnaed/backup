@@ -941,7 +941,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
 
 					// To remove previous values if new phase has smaller values
-					if((deque_aux[2] >= 2*deque_aux[1]) & (itX != taskIsInCRCLOS.end()))
+					// And the task has been critical during one point in its lifetime
+					if((deque_aux[2] >= 2*deque_aux[1]) & (non_critical[idTask] == 0))
 						clear_mpkil3[taskID] = 1;
 
 					// Check if its last value is a spike value
