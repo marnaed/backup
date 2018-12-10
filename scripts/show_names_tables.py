@@ -62,8 +62,11 @@ def main():
                 df.ix[numW,'Workload'] = wl_show_name
 
                 wl_name = args.inputdir + "/" + policy +  "/data-agg/" + wl_show_name + "_tot.csv"
+                #print(wl_name)
                 dfworkload = pd.read_table(wl_name, sep=",")
 
+                #print(name+':mean')
+                #print(dfworkload[name+':mean'].max())
                 df.ix[numW,policy] = dfworkload[name+':mean'].max()
                 dictNames[name] = df
 
