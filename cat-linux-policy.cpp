@@ -872,7 +872,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	// Apps that have changed to  critical (1) or to non-critical (0)
 	auto status = std::vector<pair_t>();
 
-    double ipcTotal, mpkiL3Total = 0;
+    double ipcTotal = 0;
+	double mpkiL3Total = 0;
 	double l3_occup_mb_total = 0;
     // Total IPC of critical applications
 	double ipc_CR = 0;
@@ -960,11 +961,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
 
-					// To remove previous values if new phase has smaller values
-					// And the task has been critical during one point in its lifetime
-					//if((deque_aux[2] >= 2*deque_aux[1]) & (non_critical[taskID] == 0))
-					//	clear_mpkil3[taskID] = 1;
-
 					// Check if its last value is a spike value
 	                // Which means a new phase in comming
 					if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= deque_aux[1]/2))
@@ -987,13 +983,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 							}
 						//}
 
-						// Clear only critical apps
-						//if (std::get<1>(*itX) == 2)
-						//	clear_mpkil3[taskID] = 1;
 
 						phase_count[taskID] += 1;
                         phase_duration[taskID] = 0;
-
 					}
 
 					// Middle value is not a spike value
@@ -1026,15 +1018,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			// Store queue modified in the dictionary
 			deque_mpkil3[taskID] = deque_aux;
 			valid_mpkil3[taskID] = deque_valid;
-
-
-			// Clear if necessary
-			//if(clear_mpkil3[taskID])
-            //{
-            //	deque_valid.clear();
-            //	LOGINF("{}: deque_valid has been cleared as a new phase is starting."_format(taskID));
-            //	clear_mpkil3[taskID] = 0;
-            //}
 
 		}
         else
@@ -1123,9 +1106,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			valid_mpkil3[idTask] = val;
 		}
 
-		// Find minimum value of deque_valid queue
-		//if((val.size() < sizeq) & (val.size() > 1))
-		//	sizeq = val.size();
 	}
 
 
@@ -1310,7 +1290,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		LOGINF("Number of intervals with no critical apps >= 5!!");
 		num_no_critical = 0;
 		reset = true;
-		//reset_configuration(tasklist);
 		return;
 	}
 
