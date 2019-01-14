@@ -860,6 +860,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     auto v_ipc = std::vector<pairD_t>();
     auto v_l3_occup_mb = std::vector<pairD_t>();
 	auto v_mpkil3 = std::vector<pairD_t>();
+	auto v_limits = std::vector<pairSD_t>();
 
 	// Set holding all MPKI-L3 values from a given interval
 	// From which the value of limit_outlier will be decided
@@ -981,11 +982,14 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 								else if(phase_duration[taskID] >= 2)
 									windowSize = phase_duration[taskID];
 								LOGINF("{}: New windowSize = {}"_format(taskID, windowSize));
+
+								clear_mpkil3[taskID] = 1;
 							}
 						//}
 
-						if (non_critical[taskID] == 0)
-							clear_mpkil3[taskID] = 1;
+						// Clear only critical apps
+						//if (std::get<1>(*itX) == 2)
+						//	clear_mpkil3[taskID] = 1;
 
 						phase_count[taskID] += 1;
                         phase_duration[taskID] = 0;
@@ -1066,7 +1070,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	}
 	if (no_change)
 	{
-		LOGINF("All values of v_mpkil3 are lower than 1 --> idle interval");
+		LOGINF("[!!] All values of v_mpkil3 are lower than 1 --> RETURN");
 		idle = true;
 		idle_count = 1;
 	}
@@ -1157,8 +1161,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	reset = false;
 
 	uint64_t size = all_mpkil3.size();
-	//LOGINF("Size:{}, Q2 pos:{}, Q3 pos:{}"_format(size,size/2,size*0.75));
-	// 3. Calculate q2 and q3
 	double q1 = *std::next(all_mpkil3.begin(), size/4);
 	double q2 = *std::next(all_mpkil3.begin(), size/2);
 	double q3 = *std::next(all_mpkil3.begin(), size*0.75);
@@ -1192,7 +1194,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
         // 5. Calculate limit_outlier
         limit_outlier = Mj + 3*MAD;
-
 	}
 	else if(outlierMethod == "Schwetman")
 	{
@@ -1206,7 +1207,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		// Calculate limit outlier with Carling's method
 	    double k = ((17.63 * size) - 23.64) / ((7.74 * size) - 3.71);
 		limit_outlier = q2 + (k * (q3 - q1));
-	    LOGINF("k = {}"_format(k));
+	    //LOGINF("k = {}"_format(k));
 	}
 	else if(outlierMethod == "Turkey")
 	{
@@ -1221,7 +1222,10 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	double max = std::get<1>(*maxit);
 
 	if(max < limit_outlier)
+	{
+		LOGINF("Q3 outlier method applied");
 		limit_outlier = q3;
+	}
 
     LOGINF("limit_outlier = {}"_format(limit_outlier));
 
