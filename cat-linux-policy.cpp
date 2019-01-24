@@ -865,6 +865,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	// Set holding all MPKI-L3 values from a given interval
 	// From which the value of limit_outlier will be decided
 	auto all_mpkil3 = std::set<double>();
+	auto limits = std::set<double>();
 
 	// Vector with outlier values (1 == outlier, 0 == not outlier)
     auto outlier = std::vector<pair_t>();
@@ -1059,10 +1060,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	}
 
 	// Check if current interval must be left idle
-    if(idle)
+    if(idle | effectTime)
     {
-        LOGINF("Idle interval {}"_format(idle_count));
-
 		for (const auto &item : taskIsInCRCLOS)
       	{
           	idTask = std::get<0>(item);
@@ -1082,12 +1081,27 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
       	expectedIPCtotal = ipcTotal;
       	id_pid.clear();
 
-        idle_count = idle_count - 1;
-        if(idle_count == 0)
-        {
-            idle = false;
-            idle_count = IDLE_INTERVALS;
-        }
+		if(idle)
+		{
+			LOGINF("Idle interval {}"_format(idle_count));
+        	idle_count = idle_count - 1;
+        	if(idle_count == 0)
+        	{
+            	idle = false;
+            	idle_count = IDLE_INTERVALS;
+        	}
+		}
+
+		if(effectTime)
+		{
+			LOGINF("Effect interval {}"_format(effect_count));
+			effect_count = effect_count - 1;
+			if(effect_count == 0)
+			{
+				effectTime = false;
+				effect_count = effectIntervals;
+			}
+		}
         return;
     }
 
@@ -1147,16 +1161,19 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	LOGINF("Size:{}, Q1:{}, Q2:{}, Q3:{}"_format(size,q1,q2,q3));
 	double limit_outlier;
 
-	if(outlierMethod == "3std")
-	{
+	//if(outlierMethod == "3std")
+	//{
 		double mean = acc::mean(macc);
 		double var = acc::variance(macc);
 
 		limit_outlier = mean + 3*std::sqrt(var);
+		v_limits.push_back(std::make_pair("3std",limit_outlier));
+		limits.insert(limit_outlier);
+		LOGINF("3std: {}"_format(limit_outlier));
 
-	}
-	else if(outlierMethod == "mad")
-	{
+	//}
+	//else if(outlierMethod == "mad")
+	//{
 		// MAD = Median Absolute Value
 		// 1. Find the median
         double Mj = medianV(all_mpkil3);
@@ -1174,32 +1191,74 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
         // 5. Calculate limit_outlier
         limit_outlier = Mj + 3*MAD;
-	}
-	else if(outlierMethod == "Schwetman")
-	{
+		v_limits.push_back(std::make_pair("mad",limit_outlier));
+		limits.insert(limit_outlier);
+		LOGINF("mad: {}"_format(limit_outlier));
+	//}
+	//else if(outlierMethod == "Schwetman")
+	//{
 		// Calculate limit outlier with Neil C. Schwetman's method
 		double Z = 1.96; //95%
 		double kn = kn_table[size];
     	limit_outlier = q2 + (((2 * (q3 - q2)) / kn) * Z);
-	}
-	else if(outlierMethod == "Carling")
-	{
+		v_limits.push_back(std::make_pair("Schwetman",limit_outlier));
+		limits.insert(limit_outlier);
+		LOGINF("Schwetman: {}"_format(limit_outlier));
+	//}
+	//else if(outlierMethod == "Carling")
+	//{
 		// Calculate limit outlier with Carling's method
 	    double k = ((17.63 * size) - 23.64) / ((7.74 * size) - 3.71);
 		limit_outlier = q2 + (k * (q3 - q1));
+		v_limits.push_back(std::make_pair("Carling",limit_outlier));
+		limits.insert(limit_outlier);
+		LOGINF("Carling: {}"_format(limit_outlier));
 	    //LOGINF("k = {}"_format(k));
-	}
-	else if(outlierMethod == "Turkey")
-	{
+	//}
+	//else if(outlierMethod == "Turkey")
+	//{
 		limit_outlier = q3 + (1.5 * (q3 - q1));
-	}
-	else if(outlierMethod == "q3")
+		v_limits.push_back(std::make_pair("Turkey",limit_outlier));
+		limits.insert(limit_outlier);
+		LOGINF("Turkey: {}"_format(limit_outlier));
+	//}
+	//else if(outlierMethod == "q3")
 		limit_outlier = q3;
+		v_limits.push_back(std::make_pair("q3",limit_outlier));
+		limits.insert(limit_outlier);
+		LOGINF("q3: {}"_format(limit_outlier));
 
 	// mecanism to avoid extreme limit_outlier values
 	// when there are lots of high mpkil3 values
-	auto maxit = std::max_element( std::begin(v_mpkil3), std::end(v_mpkil3));
-	double max = std::get<1>(*maxit);
+
+	const auto less_by_second = [](const auto& lhs, const auto& rhs){ return std::get<1>(lhs) < std::get<1>(rhs); };
+	const double max = std::get<1>(*std::max_element(v_mpkil3.begin(), v_mpkil3.end(), less_by_second));
+	LOGINF("MAX {}"_format(max));
+
+
+	size = limits.size();
+	if (outlierMethod == "auto100")
+	{
+		limit_outlier = *std::next(limits.begin(), size-1);
+		LOGINF("[!!] Limit_outlier {} from position {}"_format(limit_outlier,size-1));
+	}
+	else if (outlierMethod == "auto75")
+	{
+		limit_outlier = *std::next(limits.begin(), size*0.75);
+		LOGINF("[!!] Limit_outlier {} from position {}"_format(limit_outlier,size*0.75));
+	}
+	else if (outlierMethod == "auto50")
+	{
+		limit_outlier = *std::next(limits.begin(), size*0.50);
+		LOGINF("[!!] Limit_outlier {} from position {}"_format(limit_outlier,size*0.50));
+	}
+	else
+	{
+		std::string outl = outlierMethod;
+		auto itlim = std::find_if(v_limits.begin(), v_limits.end(),[&outl](const auto& tuple) {return std::get<0>(tuple) == outl;});
+		if(itlim != v_limits.end())
+			limit_outlier = std::get<1>(*itlim);
+	}
 
 	if(max < limit_outlier)
 	{
@@ -1644,6 +1703,10 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 							state = 8;
 						break;
 				}*/
+
+				// Leave time for actions to have effect
+				if(!idle & (effectIntervals > 0))
+					effectTime = true;
 
 				// State actions switch-case
 				if(idle)

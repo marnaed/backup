@@ -139,6 +139,10 @@ class CriticalAwareV2: public LinuxBase
     uint64_t every = -1;
     uint64_t firstInterval = 1;
 	uint64_t windowSize = 4;
+	std::string outlierMethod="Schwetman";
+	uint64_t effectIntervals = 1;
+
+	uint64_t effect_count = effectIntervals;
 
     // Masks of CLOS
     uint64_t maskCrCLOS = 0xfffff;
@@ -157,6 +161,7 @@ class CriticalAwareV2: public LinuxBase
 	// Flags
     bool firstTime = true;
 	bool idle = false;
+	bool effectTime = false;
 
 	// IDLE control variables
     uint64_t IDLE_INTERVALS = 5;
@@ -166,6 +171,7 @@ class CriticalAwareV2: public LinuxBase
     typedef std::tuple<uint32_t, uint64_t> pair_t;
 	typedef std::tuple<uint32_t, double> pairD_t;
 	typedef std::tuple<uint32_t, pid_t> pair32P_t;
+	typedef std::tuple<std::string, double> pairSD_t;
 	//std::set<double> all_mpkil3;
     std::vector<pair_t> taskIsInCRCLOS;
     std::vector<pair_t> pid_CPU;
@@ -309,13 +315,26 @@ class CriticalAwareV2: public LinuxBase
 	// number of times consecutive critical_apps = 0 detected
 	uint64_t num_no_critical = 0;
 
+	// Define accumulators
+    typedef acc::accumulator_set<
+        double, acc::stats<
+            acc::tag::mean,
+            acc::tag::variance
+        >
+    >
+    ca_accum_t;
+
+    ca_accum_t macc;
+
     public:
 
-	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval, uint64_t _windowSize) : every(_every), firstInterval(_firstInterval), windowSize(_windowSize) {}
+	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval, uint64_t _windowSize, std::string _outlierMethod, uint64_t _effectIntervals) : every(_every), firstInterval(_firstInterval), windowSize(_windowSize), outlierMethod(_outlierMethod), effectIntervals(_effectIntervals) {}
 
     virtual ~CriticalAwareV2() = default;
 
 	void reset_configuration(const tasklist_t &);
+
+	double medianV(std::set<double> vec);
 
     //configure CAT
     void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
