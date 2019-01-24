@@ -687,42 +687,48 @@ double CriticalAwareV2::medianV(std::set<double> vec)
 	  return med;
   }
 
-
+/*
+ * Update configuration method allows to change from one
+ * cache configuration to another, i.e. when a different
+ * number of critical apps is detected
+ */
 void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new)
 {
 
 	uint64_t new_clos;
 
 	// 1. Update global variables
-	if((num_critical_new == 0) | (num_critical_new > 4))
+	if ((num_critical_new == 0) | (num_critical_new > 4))
 		state = 4;
 	else
 		state = num_critical_new;
-	CLOS_key = 3;
+
+	// Mecanism to isolate apps
+	// CLOS_key = 3;
+
 	idle = false;
 	idle_count = IDLE_INTERVALS;
+	effect_count = effectIntervals;
 
-	LOGINF("YYY From {} ways to {} ways"_format(num_critical_old,num_critical_new));
+	LOGINF("[UPDATE] From {} ways to {} ways"_format(num_critical_old,num_critical_new));
 
-	// If 4 critical apps detected
-	if((num_critical_new == 0) | (num_critical_new >= 4)){
-		// assign CLOSes mask 0xfffff
-		for( int clos = 1; clos <= 3; clos += 1 )
-		{
-			//if (clos != 4)
+	// If 4 or 0 new critical apps are detected...
+	// >> assign CLOSes mask 0xfffff
+	// >> assign all apps to CLOS 1
+	if ((num_critical_new == 0) | (num_critical_new >= 4)){
+		for (int clos = 1; clos <= 3; clos += 1)
 			LinuxBase::get_cat()->set_cbm(clos,0xfffff);
-		}
-		// assign all apps to CLOS 1
+
 		for (const auto &item : v)
 		{
 			uint32_t taskID = std::get<0>(item);
 			uint64_t CLOS = std::get<1>(item);
 
 			// Find PID corresponding to the ID
-			auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+			auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
             pid_t taskPID = std::get<1>(*it1);
 
-			if ((CLOS != 1) && (CLOS != 4))
+			if (CLOS != 1)
 			{
 				LinuxBase::get_cat()->add_task(1,taskPID);
 				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
@@ -730,22 +736,25 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 			}
 		}
-		LOGINF("All tasks assigned to CLOS 1. TaskIsInCRCLOS updated");
+
+		LOGINF("[UPDATE] All tasks assigned to CLOS 1. TaskIsInCRCLOS updated");
 		return;
 	}
 
-	// 2. Assign apps to new CLOSes
+	// If 1, 2 or 3 critical apps are detected
 	for (const auto &item : v)
     {
 		uint32_t taskID = std::get<0>(item);
-		auto it = std::find_if(status.begin(), status.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
-		auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+		auto it = std::find_if(status.begin(), status.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+		auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
 		pid_t taskPID = std::get<1>(*it1);
 
-		if(it != status.end())
+		// Add applications to CLOS 1 or 2
+		// depending on their new status
+		if (it != status.end())
 		{
 			uint64_t cr_val = std::get<1>(*it);
-			if(cr_val)
+			if (cr_val)
 			{
 				// cr_val will be 1 for the new critical apps
             	LinuxBase::get_cat()->add_task(2,taskPID);
@@ -757,8 +766,9 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
             	LinuxBase::get_cat()->add_task(1,taskPID);
 				new_clos = 1;
 			}
+
 			//update taskIsInCRCLOS
-			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
 			it2 = taskIsInCRCLOS.erase(it2);
 			taskIsInCRCLOS.push_back(std::make_pair(taskID,new_clos));
 		}
@@ -768,14 +778,13 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 			// Return non-critical app(s) in CLOS 3 or 5 to CLOS 1
 			uint64_t clos_value = std::get<1>(item);
 			//if((clos_value == 3) | (clos_value == 5))
-			if( clos_value == 3 )
+			if(clos_value == 3)
 			{
-				LOGINF("CLOS {}"_format(clos_value));
 				LinuxBase::get_cat()->add_task(1,taskPID);
-				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
 				it2 = taskIsInCRCLOS.erase(it2);
 				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
-				LOGINF("Task {} returned to CLOS 1"_format(taskID));
+				LOGINF("[UPDATE] Task {} was in CLOS {} --> returned to CLOS 1"_format(taskID, clos_value));
 			}
 		}
 	}
@@ -802,8 +811,8 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 	num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
 	num_ways_CLOS_2 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(2));
 	num_shared_ways = 2;
-	LOGINF("YYY CLOS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
-	LOGINF("YYY CLOS 2 (CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
+	LOGINF("[UPDATE] CLOS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
+	LOGINF("[UPDATE] CLOS 2 (CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
 }
 
 /*
