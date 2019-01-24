@@ -816,7 +816,7 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 }
 
 /*
- * Main method of the Critical-Aware V2 Policy
+ * Main method of the Critical-Aware V2 (CAV2) Policy
  */
 void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklist)
 {
@@ -828,23 +828,29 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     	return;
 
 	/** LOCAL VARIABLES DECLARATION**/
+	/** VECTORS **/
     // (uint32_t, double) vectors of tuples
     auto v_ipc = std::vector<pairD_t>();
     auto v_l3_occup_mb = std::vector<pairD_t>();
 	auto v_mpkil3 = std::vector<pairD_t>();
+
+	// (std::string, double) vectors of tuples
 	auto v_limits = std::vector<pairSD_t>();
 
-	// Set holding all MPKI-L3 values from a given interval
-	// From which the value of limit_outlier will be decided
-	auto all_mpkil3 = std::set<double>();
-	auto limits = std::set<double>();
-
+	// (uint32_t, uint64_t) vectors of tuples
 	// Vector with outlier values (1 == outlier, 0 == not outlier)
     auto outlier = std::vector<pair_t>();
-
 	// Apps that have changed to  critical (1) or to non-critical (0)
 	auto status = std::vector<pair_t>();
 
+	/** SETS **/
+	// Set holding all MPKI-L3 values from a given interval
+	// used to compute the value of limit_outlier
+	auto all_mpkil3 = std::set<double>();
+	// Set to order all limit_outlier values computed
+	auto limits = std::set<double>();
+
+    /** VARIABLES **/
     double ipcTotal = 0;
 	double mpkiL3Total = 0;
 	double l3_occup_mb_total = 0;
@@ -852,13 +858,12 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	double ipc_CR = 0;
 	// Total IPC of non-critical applications
     double ipc_NCR = 0;
-
     // Number of critical apps found in the interval
     uint32_t critical_apps = 0;
 	// Flag that set to true when number of critical apps detected has changed from previous
     bool change_in_outliers = false;
-
 	uint32_t idTask;
+	/********************************/
 
     // Gather data for each task
     for (const auto &task_ptr : tasklist)
