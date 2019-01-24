@@ -688,43 +688,6 @@ double CriticalAwareV2::medianV(std::set<double> vec)
   }
 
 
-void CriticalAwareV2::reset_configuration(const tasklist_t &tasklist)
-{
-    for (const auto &task_ptr : tasklist)
-    {
-        const Task &task = *task_ptr;
-        pid_t taskPID = task.pid;
-        LinuxBase::get_cat()->add_task(1,taskPID);
-    }
-
-	taskIsInCRCLOS.clear();
-
-    //change masks of CLOS to 0xfffff
-    LinuxBase::get_cat()->set_cbm(1,0xfffff);
-    LinuxBase::get_cat()->set_cbm(2,0xfffff);
-
-    firstTime = 1;
-    state = 0;
-    expectedIPCtotal = 0;
-
-    maskCrCLOS = 0xfffff;
-    maskNonCrCLOS = 0xfffff;
-
-    num_ways_CLOS_2 = 20;
-    num_ways_CLOS_1 = 20;
-
-    num_shared_ways = 0;
-
-    idle = false;
-    idle_count = IDLE_INTERVALS;
-
-    LOGINF("Reset performed. Original configuration restored");
-}
-
-
-/*
- * Auxiliar method of Critical Alone policy to reset configuration
- */
 void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new)
 {
 

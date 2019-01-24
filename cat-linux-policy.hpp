@@ -332,7 +332,6 @@ class CriticalAwareV2: public LinuxBase
 
     virtual ~CriticalAwareV2() = default;
 
-	void reset_configuration(const tasklist_t &);
 
 	double medianV(std::set<double> vec);
 
