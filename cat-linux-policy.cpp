@@ -878,35 +878,36 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         uint64_t l3_miss = task.stats.last("mem_load_uops_retired.l3_miss");
         uint64_t inst = task.stats.last("instructions");
         double ipc = task.stats.last("ipc");
-        double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024 / 1024;
-
+        double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024*1024;
         double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
 
+		// Accumulate total values
 		ipcTotal += ipc;
 		mpkiL3Total += MPKIL3;
 		l3_occup_mb_total += l3_occup_mb;
 
         LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,l3_occup_mb));
-        v_ipc.push_back(std::make_pair(taskID, ipc));
+
+		// Create tuples and add them to vectors
+		v_ipc.push_back(std::make_pair(taskID, ipc));
         v_l3_occup_mb.push_back(std::make_pair(taskID, l3_occup_mb));
         pid_CPU.push_back(std::make_pair(taskID, cpu));
 		id_pid.push_back(std::make_pair(taskID, taskPID));
 
 		// Update queue of each task with last value of MPKI-L3
-		// Do not consider the excluded application
 		auto it = deque_mpkil3.find(taskID);
 		auto it2 = valid_mpkil3.find(taskID);
 
-        if(it != deque_mpkil3.end())
+        if (it != deque_mpkil3.end())
 		{
 			std::deque<double> deque_aux = it->second;
 			std::deque<double> deque_valid = it2->second;
 
-			// Remove values until vector  size is equal to sliding window size
+			// Remove values until vector size is equal to sliding window size
 			while (deque_valid.size() >= windowSize)
 				deque_valid.pop_back();
 
-			if(clear_mpkil3[taskID])
+			if (clear_mpkil3[taskID])
 			{
 				deque_valid.clear();
 				LOGINF("{}: deque_valid has been cleared as a new phase is starting."_format(taskID));
@@ -920,7 +921,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			phase_duration[taskID] += 1;
 
 			double insert_value;
-			if(deque_aux.size() == 3)
+			if (deque_aux.size() == 3)
 			{
 				LOGINF("{}: {} {} {}"_format(taskID,deque_aux[0],deque_aux[1],deque_aux[2]));
 
@@ -933,35 +934,27 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					deque_valid.push_front(insert_value);
 					deque_aux.pop_back(); //remove value 2
 					deque_aux.pop_back(); //remove value 1
-					phase_duration[taskID] -= 1;
 				}
 				else
 				{
-					auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
-
-					// Check if its last value is a spike value
+					// Check if last value is a spike value
 	                // Which means a new phase in comming
-					if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= deque_aux[1]/2))
+					if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= 0.5*deque_aux[1]))
 					{
-						// If it is not the first phase
-						//if(phase_count[taskID] > 1)
-						//{
-							// Check if application is a critical application
-                         	if((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
-							{
-								 LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID],phase_duration[taskID]));
+						// Check if application is a critical application
+						auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+                        if ((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
+						{
+							LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID],phase_duration[taskID]));
 
-								if(phase_duration[taskID] > 10)
-									windowSize = 10;
-								else if(phase_duration[taskID] >= 2)
-									windowSize = phase_duration[taskID];
-								LOGINF("{}: New windowSize = {}"_format(taskID, windowSize));
+							if(phase_duration[taskID] > 10)
+								windowSize = 10;
+							else if(phase_duration[taskID] >= 2)
+								windowSize = phase_duration[taskID];
+							LOGINF("{}: New windowSize = {}"_format(taskID, windowSize));
 
-								clear_mpkil3[taskID] = 1;
-							}
-						//}
-
-
+							clear_mpkil3[taskID] = 1;
+						}
 						phase_count[taskID] += 1;
                         phase_duration[taskID] = 0;
 					}
@@ -978,13 +971,13 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 				// Add or update value to mpkil3_prev vector
 				auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
-                if(it_pm == v_mpkil3_prev.end())
+                if (it_pm == v_mpkil3_prev.end())
                 	v_mpkil3_prev.push_back(std::make_pair(taskID,insert_value));
                 else
                     std::get<1>(*it_pm) = insert_value;
 
 			}
-			else if(current_interval >= firstInterval)
+			else if (current_interval >= firstInterval)
 			{
 				// Get previous valid value of MPKI-L3 if no new values available
 				auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
@@ -1011,7 +1004,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			v_mpkil3.push_back(std::make_pair(taskID,MPKIL3));
         }
 
-	}
+	} // End for taskilist
+
 	LOGINF("Total L3 occupation: {}"_format(l3_occup_mb_total));
 	assert(l3_occup_mb_total > 0);
 
@@ -1022,6 +1016,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		return;
 	}
 
+	// If all values are smaller than 1
+	// Do not perform further action
 	bool no_change = true;
 	for (const auto &item : v_mpkil3)
     {
