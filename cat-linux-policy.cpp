@@ -1022,14 +1022,17 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	for (const auto &item : v_mpkil3)
     {
     	double MPKIL3Task = std::get<1>(item);
-		if(MPKIL3Task >= 1)
+		if (MPKIL3Task >= 1)
 			no_change = false;
 	}
 	if (no_change)
 	{
 		LOGINF("[!!] All values of v_mpkil3 are lower than 1 --> RETURN");
-		idle = true;
-		idle_count = 1;
+		if (!idle)
+		{
+			idle = true;
+			idle_count = 1;
+		}
 	}
 
 	// Check if current interval must be left idle
@@ -1041,35 +1044,35 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			auto itIPC = std::find_if(v_ipc.begin(), v_ipc.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
             double ipcTask = std::get<1>(*itIPC);
 
-			if(std::get<1>(item) == 1)
+			if (std::get<1>(item) == 1)
 				ipc_NCR += ipcTask;
-			else if(std::get<1>(item) == 2)
+			else if (std::get<1>(item) == 2)
 				ipc_CR += ipcTask;
 		}
 
 		ipc_CR_prev = ipc_CR;
       	ipc_NCR_prev = ipc_NCR;
 
-      	// Assign total IPC of this interval to previos value
+      	// Assign total IPC of this interval to previous value
       	expectedIPCtotal = ipcTotal;
       	id_pid.clear();
 
-		if(idle)
+		if (idle)
 		{
 			LOGINF("Idle interval {}"_format(idle_count));
         	idle_count = idle_count - 1;
-        	if(idle_count == 0)
+        	if (idle_count == 0)
         	{
             	idle = false;
             	idle_count = IDLE_INTERVALS;
         	}
 		}
 
-		if(effectTime)
+		if (effectTime)
 		{
 			LOGINF("Effect interval {}"_format(effect_count));
 			effect_count = effect_count - 1;
-			if(effect_count == 0)
+			if (effect_count == 0)
 			{
 				effectTime = false;
 				effect_count = effectIntervals;
@@ -1078,16 +1081,17 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         return;
     }
 
-	uint64_t sizeq = windowSize;
+	// Check values inside valid_mpkil3 deque are not more than double size
 	for (auto const &x : valid_mpkil3)
 	{
 		std::deque<double> val = x.second;
 		idTask = x.first;
 
 		// Check is windowSize is appropriate
-		if(non_critical[idTask] == 0)
+		if (non_critical[idTask] == 0)
 		{
-			while((val.front() >= 2*val.back()) | (2*val.front() <= val.back()))
+			while ((val.front() >= 2*val.back()) | (2*val.front() <= val.back()))
+				LOGINF("{} : remove large value from deque"_format(idTask));
 				val.pop_back();
 
 			valid_mpkil3[idTask] = val;
@@ -1095,8 +1099,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	}
 
-
-	// Add values of MPKI-L3 from each app to the set
+	// Add values of MPKI-L3 from each app to the common set
 	for (auto const &x : valid_mpkil3)
 	{
 		// Get deque
@@ -1113,13 +1116,11 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		else
 		{
 			// Add values
-			uint64_t count = 0;
-			for (auto i = val.cbegin(); (i != val.cend()) & (count < sizeq); ++i)
+			for (auto i = val.cbegin(); i != val.cend(); ++i)
 			{
 				res = res + std::to_string(*i) + " ";
 				all_mpkil3.insert(*i);
 				macc(*i);
-				count = count + 1;
 			}
 		}
 		LOGINF(res);
