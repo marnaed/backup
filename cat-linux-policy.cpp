@@ -1125,9 +1125,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		}
 		LOGINF(res);
 	}
-
 	reset = false;
 
+	/** LIMIT OUTLIER CALCULATION **/
 	uint64_t size = all_mpkil3.size();
 	double q1 = *std::next(all_mpkil3.begin(), size/4);
 	double q2 = *std::next(all_mpkil3.begin(), size/2);
@@ -1135,96 +1135,72 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	LOGINF("Size:{}, Q1:{}, Q2:{}, Q3:{}"_format(size,q1,q2,q3));
 	double limit_outlier;
 
-	//if(outlierMethod == "3std")
-	//{
-		double mean = acc::mean(macc);
-		double var = acc::variance(macc);
+	/** 3std **/
+	double mean = acc::mean(macc);
+	double var = acc::variance(macc);
+	limit_outlier = mean + 3*std::sqrt(var);
+	v_limits.push_back(std::make_pair("3std",limit_outlier));
+	limits.insert(limit_outlier);
+	LOGINF("3std: {}"_format(limit_outlier));
 
-		limit_outlier = mean + 3*std::sqrt(var);
-		v_limits.push_back(std::make_pair("3std",limit_outlier));
-		limits.insert(limit_outlier);
-		LOGINF("3std: {}"_format(limit_outlier));
+	/** MAD = Median Absolute Value **/
+	// 1. Find the median
+    double Mj = medianV(all_mpkil3);
+    // 2. Subtract from each value the median
+    auto aux = std::set<double>();
+    for (auto f : all_mpkil3)
+        aux.insert(fabs (f - Mj));
+    // 3. Find the median
+    double Mi = medianV(aux);
+    // 4. Multiply median by b (assume normal distribution)
+    double MAD = Mi * 1.4826;
+    // 5. Calculate limit_outlier
+    limit_outlier = Mj + 3*MAD;
+	v_limits.push_back(std::make_pair("mad",limit_outlier));
+	limits.insert(limit_outlier);
+	LOGINF("mad: {}"_format(limit_outlier));
 
-	//}
-	//else if(outlierMethod == "mad")
-	//{
-		// MAD = Median Absolute Value
-		// 1. Find the median
-        double Mj = medianV(all_mpkil3);
+	/** Neil C. Schwetman's method **/
+	double Z = 1.96; //95%
+	double kn = kn_table[size];
+    limit_outlier = q2 + (((2 * (q3 - q2)) / kn) * Z);
+	v_limits.push_back(std::make_pair("Schwetman",limit_outlier));
+	limits.insert(limit_outlier);
+	LOGINF("Schwetman: {}"_format(limit_outlier));
 
-        // 2. Subtract from each value the median
-        auto aux =  std::set<double>();
-        for(auto f : all_mpkil3)
-        	aux.insert(fabs (f - Mj));
+	/** Carling's method **/
+	double k = ((17.63 * size) - 23.64) / ((7.74 * size) - 3.71);
+	limit_outlier = q2 + (k * (q3 - q1));
+	v_limits.push_back(std::make_pair("Carling",limit_outlier));
+	limits.insert(limit_outlier);
+	LOGINF("Carling: {}"_format(limit_outlier));
 
-        // 3. Find the median
-        double Mi = medianV(aux);
+	/** Turkey **/
+	limit_outlier = q3 + (1.5 * (q3 - q1));
+	v_limits.push_back(std::make_pair("Turkey",limit_outlier));
+	limits.insert(limit_outlier);
+	LOGINF("Turkey: {}"_format(limit_outlier));
 
-        // 4. Multiply median by b (assume normal distribution)
-        double MAD = Mi * 1.4826;
+	/** Q3 = limit_outlier is equal to Q3 **/
+	limit_outlier = q3;
+	v_limits.push_back(std::make_pair("q3",limit_outlier));
+	limits.insert(limit_outlier);
+	LOGINF("q3: {}"_format(limit_outlier));
 
-        // 5. Calculate limit_outlier
-        limit_outlier = Mj + 3*MAD;
-		v_limits.push_back(std::make_pair("mad",limit_outlier));
-		limits.insert(limit_outlier);
-		LOGINF("mad: {}"_format(limit_outlier));
-	//}
-	//else if(outlierMethod == "Schwetman")
-	//{
-		// Calculate limit outlier with Neil C. Schwetman's method
-		double Z = 1.96; //95%
-		double kn = kn_table[size];
-    	limit_outlier = q2 + (((2 * (q3 - q2)) / kn) * Z);
-		v_limits.push_back(std::make_pair("Schwetman",limit_outlier));
-		limits.insert(limit_outlier);
-		LOGINF("Schwetman: {}"_format(limit_outlier));
-	//}
-	//else if(outlierMethod == "Carling")
-	//{
-		// Calculate limit outlier with Carling's method
-	    double k = ((17.63 * size) - 23.64) / ((7.74 * size) - 3.71);
-		limit_outlier = q2 + (k * (q3 - q1));
-		v_limits.push_back(std::make_pair("Carling",limit_outlier));
-		limits.insert(limit_outlier);
-		LOGINF("Carling: {}"_format(limit_outlier));
-	    //LOGINF("k = {}"_format(k));
-	//}
-	//else if(outlierMethod == "Turkey")
-	//{
-		limit_outlier = q3 + (1.5 * (q3 - q1));
-		v_limits.push_back(std::make_pair("Turkey",limit_outlier));
-		limits.insert(limit_outlier);
-		LOGINF("Turkey: {}"_format(limit_outlier));
-	//}
-	//else if(outlierMethod == "q3")
-		limit_outlier = q3;
-		v_limits.push_back(std::make_pair("q3",limit_outlier));
-		limits.insert(limit_outlier);
-		LOGINF("q3: {}"_format(limit_outlier));
-
-	// mecanism to avoid extreme limit_outlier values
-	// when there are lots of high mpkil3 values
-
-	const auto less_by_second = [](const auto& lhs, const auto& rhs){ return std::get<1>(lhs) < std::get<1>(rhs); };
-	const double max = std::get<1>(*std::max_element(v_mpkil3.begin(), v_mpkil3.end(), less_by_second));
-	LOGINF("MAX {}"_format(max));
-
-
+	// Assign limit_outlier to corresponding outlierMethod
+	// i.e. the one stated in the template
 	size = limits.size();
-	if (outlierMethod == "auto100")
+	if (outlierMethod == "auto1")
 	{
-		limit_outlier = *std::next(limits.begin(), size-1);
-		LOGINF("[!!] Limit_outlier {} from position {}"_format(limit_outlier,size-1));
+		auto gt10 = find_if(limits.begin(), limits.end(), [](int x){return x>1;});
+		if ( gt10 != limits.end())
+			limit_outlier = *gt10;
+		LOGINF("auto1: {}"_format(limit_outlier));
 	}
 	else if (outlierMethod == "auto75")
 	{
 		limit_outlier = *std::next(limits.begin(), size*0.75);
 		LOGINF("[!!] Limit_outlier {} from position {}"_format(limit_outlier,size*0.75));
-	}
-	else if (outlierMethod == "auto50")
-	{
-		limit_outlier = *std::next(limits.begin(), size*0.50);
-		LOGINF("[!!] Limit_outlier {} from position {}"_format(limit_outlier,size*0.50));
 	}
 	else
 	{
@@ -1234,19 +1210,23 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			limit_outlier = std::get<1>(*itlim);
 	}
 
+	// Mecanism to avoid extreme limit_outlier values
+	// when there are lots of high mpkil3 values
+	const auto less_by_second = [](const auto& lhs, const auto& rhs){ return std::get<1>(lhs) < std::get<1>(rhs); };
+    const double max = std::get<1>(*std::max_element(v_mpkil3.begin(), v_mpkil3.end(), less_by_second));
+	LOGINF("Maximum of v_mpkil3: {}"_format(max));
 	if(max < limit_outlier)
 	{
 		LOGINF("Q3 outlier method applied");
 		limit_outlier = q3;
 	}
-
     LOGINF("limit_outlier = {}"_format(limit_outlier));
 
 	// Clear set
 	all_mpkil3.clear();
 
 	std::string res;
-    // Check if MPKI-L3 of each APP is 2 stds o more higher than the mean MPKI-L3
+    // Check if MPKI-L3 of each APP is higher than the limit outlier
     for (const auto &item : v_mpkil3)
     {
     	double MPKIL3Task = std::get<1>(item);
