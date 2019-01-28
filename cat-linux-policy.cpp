@@ -1147,6 +1147,19 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	limits.insert(limit_outlier);
 	LOGINF("3std: {}"_format(limit_outlier));
 
+	/** 2std **/
+    limit_outlier = mean + 2.5*std::sqrt(var);
+    v_limits.push_back(std::make_pair("2.5std",limit_outlier));
+    limits.insert(limit_outlier);
+    LOGINF("2.5std: {}"_format(limit_outlier));
+
+
+	/** 2std **/
+	limit_outlier = mean + 2*std::sqrt(var);
+    v_limits.push_back(std::make_pair("2std",limit_outlier));
+    limits.insert(limit_outlier);
+    LOGINF("2std: {}"_format(limit_outlier));
+
 	/** MAD = Median Absolute Value **/
 	// 1. Find the median
     double Mj = medianV(all_mpkil3);
