@@ -863,6 +863,10 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 	// Flag that set to true when number of critical apps detected has changed from previous
     bool change_in_outliers = false;
 	uint32_t idTask;
+
+	// Accumulator to calculate mean and std of mpkil3
+	ca_accum_t macc;
+
 	/********************************/
 
     // Gather data for each task

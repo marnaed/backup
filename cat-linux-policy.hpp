@@ -324,8 +324,6 @@ class CriticalAwareV2: public LinuxBase
     >
     ca_accum_t;
 
-    ca_accum_t macc;
-
     public:
 
 	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval, uint64_t _windowSize, std::string _outlierMethod, uint64_t _effectIntervals) : every(_every), firstInterval(_firstInterval), windowSize(_windowSize), outlierMethod(_outlierMethod), effectIntervals(_effectIntervals) {}
