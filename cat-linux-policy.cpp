@@ -878,7 +878,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         uint64_t l3_miss = task.stats.last("mem_load_uops_retired.l3_miss");
         uint64_t inst = task.stats.last("instructions");
         double ipc = task.stats.last("ipc");
-        double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024*1024;
+        double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024 / 1024;
         double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
 
 		// Accumulate total values
@@ -1018,7 +1018,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	// If all values are smaller than 1
 	// Do not perform further action
-	bool no_change = true;
+	/*bool no_change = true;
 	for (const auto &item : v_mpkil3)
     {
     	double MPKIL3Task = std::get<1>(item);
@@ -1033,7 +1033,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			idle = true;
 			idle_count = 1;
 		}
-	}
+	}*/
 
 	// Check if current interval must be left idle
     if(idle | effectTime)
@@ -1082,7 +1082,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     }
 
 	// Check values inside valid_mpkil3 deque are not more than double size
-	for (auto const &x : valid_mpkil3)
+	/*for (auto const &x : valid_mpkil3)
 	{
 		std::deque<double> val = x.second;
 		idTask = x.first;
@@ -1097,7 +1097,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			valid_mpkil3[idTask] = val;
 		}
 
-	}
+	}*/
 
 	// Add values of MPKI-L3 from each app to the common set
 	for (auto const &x : valid_mpkil3)
