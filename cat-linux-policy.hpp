@@ -141,6 +141,7 @@ class CriticalAwareV2: public LinuxBase
 	uint64_t windowSize = 4;
 	std::string outlierMethod="Schwetman";
 	uint64_t effectIntervals = 1;
+	std::string partitionScheme = "ca";
 
 	uint64_t effect_count = effectIntervals;
 
@@ -326,7 +327,7 @@ class CriticalAwareV2: public LinuxBase
 
     public:
 
-	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval, uint64_t _windowSize, std::string _outlierMethod, uint64_t _effectIntervals) : every(_every), firstInterval(_firstInterval), windowSize(_windowSize), outlierMethod(_outlierMethod), effectIntervals(_effectIntervals) {}
+	CriticalAwareV2(uint64_t _every, uint64_t _firstInterval, uint64_t _windowSize, std::string _outlierMethod, uint64_t _effectIntervals, std::string _partitionScheme) : every(_every), firstInterval(_firstInterval), windowSize(_windowSize), outlierMethod(_outlierMethod), effectIntervals(_effectIntervals), partitionScheme(_partitionScheme){}
 
     virtual ~CriticalAwareV2() = default;
 

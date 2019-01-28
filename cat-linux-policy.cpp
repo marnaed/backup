@@ -790,22 +790,45 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 	}
 
 	// 3. Assign preconfigured masks to CLOSes 1 and 2
-	switch(num_critical_new)
+	if (partitionScheme == "ca")
 	{
-		case 1:
-			maskCrCLOS = 0xfff00;
-			maskNonCrCLOS = 0x003ff;
-			break;
-		case 2:
-			maskCrCLOS = 0xfff80;
-            maskNonCrCLOS = 0x001ff;
-			break;
-		case 3:
-			maskCrCLOS = 0xfffc0;
-            maskNonCrCLOS = 0x000ff;
-		default:
-			break;
+		switch (num_critical_new)
+		{
+			case 1:
+				maskCrCLOS = 0xfff00;
+				maskNonCrCLOS = 0x003ff;
+				break;
+			case 2:
+				maskCrCLOS = 0xfff80;
+            	maskNonCrCLOS = 0x001ff;
+				break;
+			case 3:
+				maskCrCLOS = 0xfffc0;
+            	maskNonCrCLOS = 0x000ff;
+			default:
+				break;
+		}
 	}
+	else if (partitionScheme == "cad")
+	{
+		maskCrCLOS = 0xfffff;
+		switch (num_critical_new)
+        {
+        	case 1:
+				maskNonCrCLOS = 0xfffc0;
+                break;
+			case 2:
+                maskNonCrCLOS = 0xfff00;
+                break;
+			case 3:
+                maskNonCrCLOS = 0xffc00;
+                break;
+			default:
+				break;
+		}
+
+	}
+
 	LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 	LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 	num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
@@ -1320,33 +1343,65 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     if (firstTime)
     {
     	// Set ways of CLOS 1 and 2
-        switch ( critical_apps )
-        {
-            case 1:
-            	// 1 critical app = 12cr10others
-                maskCrCLOS = 0xfff00;
-                maskNonCrCLOS = 0x003ff;
-                state = 1;
-                break;
-            case 2:
-                // 2 critical apps = 13cr9others
-                maskCrCLOS = 0xfff80;
-                maskNonCrCLOS = 0x001ff;
-                state = 2;
-                break;
-            case 3:
-                // 3 critical apps = 14cr8others
-                maskCrCLOS = 0xfffc0;
-                maskNonCrCLOS = 0x000ff;
-                state = 3;
-                break;
-            default:
-                // no critical apps or more than 3 = 20cr20others
-                maskCrCLOS = 0xfffff;
-                maskNonCrCLOS = 0xfffff;
-                state = 4;
-                break;
-		} // close switch
+        if(partitionScheme == "ca")
+		{
+			switch ( critical_apps )
+        	{
+            	case 1:
+            		// 1 critical app = 12cr10others
+                	maskCrCLOS = 0xfff00;
+                	maskNonCrCLOS = 0x003ff;
+                	state = 1;
+                	break;
+        	    case 2:
+            	    // 2 critical apps = 13cr9others
+               	 	maskCrCLOS = 0xfff80;
+                	maskNonCrCLOS = 0x001ff;
+                	state = 2;
+                	break;
+            	case 3:
+                	// 3 critical apps = 14cr8others
+                	maskCrCLOS = 0xfffc0;
+                	maskNonCrCLOS = 0x000ff;
+                	state = 3;
+                	break;
+            	default:
+                	// no critical apps or more than 3 = 20cr20others
+                	maskCrCLOS = 0xfffff;
+                	maskNonCrCLOS = 0xfffff;
+                	state = 4;
+                	break;
+			} // close switch
+		}
+		else if(partitionScheme == "cad")
+		{
+			maskCrCLOS = 0xfffff;
+			switch ( critical_apps )
+            {
+                 case 1:
+                     // 1 critical app = 14 ways to non-critical
+                     maskNonCrCLOS = 0xfffc0;
+                     state = 1;
+                     break;
+                 case 2:
+                     // 2 critical apps = 12 ways to non-critical
+                     maskNonCrCLOS = 0xfff00;
+                     state = 2;
+                     break;
+                 case 3:
+                     // 3 critical apps = 10 ways to non-critical
+                     maskNonCrCLOS = 0xffc00;
+                     state = 3;
+                     break;
+                 default:
+                     // no critical apps or more than 3 = 20cr20others
+                     maskNonCrCLOS = 0xfffff;
+                     state = 4;
+                     break;
+             } // close switch
+
+		}
+
 
 		// Set masks to each CLOS
         LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
@@ -1586,32 +1641,34 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				LOGINF("IPC total {} vs.Expected IPC total {}"_format(ipcTotal,expectedIPCtotal));
 				double UP_limit_IPC = expectedIPCtotal * 1.04;
 				double LOW_limit_IPC = expectedIPCtotal  * 0.96;
-				double NCR_limit_IPC = ipc_NCR_prev*0.96;
-				double CR_limit_IPC = ipc_CR_prev*0.96;
+				double NCR_limit_IPC = ipc_NCR_prev * 0.96;
+				double CR_limit_IPC = ipc_CR_prev * 0.96;
 
-				if(ipcTotal > UP_limit_IPC)
+				if (ipcTotal > UP_limit_IPC)
 					LOGINF("New IPC is BETTER: IPCtotal {} > {}"_format(ipcTotal,UP_limit_IPC));
-				else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+				else if ((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
 					LOGINF("WORSE CR IPC: CR {} < {} && NCR {} >= {}"_format(ipc_CR,CR_limit_IPC,ipc_NCR,NCR_limit_IPC));
-				else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+				else if ((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
 					LOGINF("WORSE NCR IPC: NCR {} < {} && CR {} >= {}"_format(ipc_NCR,NCR_limit_IPC,ipc_CR,CR_limit_IPC));
-				else if( (ipc_CR < CR_limit_IPC) && (ipc_NCR < NCR_limit_IPC))
+				else if ((ipc_CR < CR_limit_IPC) && (ipc_NCR < NCR_limit_IPC))
 					LOGINF("BOTH IPCs are WORSE: CR {} < {} && NCR {} < {}"_format(ipc_CR,CR_limit_IPC,ipc_NCR,NCR_limit_IPC));
 				else
 					LOGINF("BOTH IPCs are EQUAL (NOT WORSE)");
 
 				//transitions switch-case
+				if (partitionScheme == "ca")
+				{
 				switch (state)
                 {
                 	case 1: case 2: case 3:
-                        if(ipcTotal > UP_limit_IPC)
+                        if (ipcTotal > UP_limit_IPC)
                             idle = true;
-                        else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+                        else if ((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                             state = 5;
 							//idle = true;
-                     	else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+                     	else if ((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             state = 6;
-                        else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+                        else if ((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
                             state = 5;
                         else
                             state = 5;
@@ -1619,33 +1676,79 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
                     case 5: case 6:
 
-                        if(ipcTotal > UP_limit_IPC)
+                        if (ipcTotal > UP_limit_IPC)
                             idle = true;
-                        else if( (ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+                        else if ((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                             state = 8;
 							//idle = true;
-                        else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+                        else if ((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             state = 7;
-                        else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+                        else if ((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
                             state = 8;
                         else // NCR and CR worse
                             state = 8;
                         break;
 
                     case 7: case 8:
-                        if(ipcTotal > UP_limit_IPC)
+                        if (ipcTotal > UP_limit_IPC)
                             idle = true;
-                        else if((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+                        else if ((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
                             state = 5;
 							//idle = true;
-                        else if((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+                        else if ((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
                             state = 6;
-                        else if((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+                        else if ((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
                             state = 5;
                         else // NCR and CR worse
                             state = 5;
                         break;
-                }
+                }// End switch
+				}
+				else if (partitionScheme == "cad")
+				{
+					switch (state)
+                  	{
+                    	case 1: case 2: case 3:
+                          	if (ipcTotal > UP_limit_IPC)
+                              	idle = true;
+                          	else if ((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+                              	state = 5; // equal
+                          	else if ((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+                            	state = 6; // worse NCR
+                          	else if ((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+                              	state = 5; // worse CR
+                          	else
+                             	state = 5; // worse all
+                          	break;
+
+						case 5:
+                          if (ipcTotal > UP_limit_IPC)
+                              idle = true;
+                          else if ((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+                              state = 5; // equal
+                          else if ((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+                              state = 6; // worse ncr
+                          else if ((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+                              state = 5; // worse cr
+                          else // NCR and CR worse
+                              state = 6; // worse all
+                          break;
+
+						case 6:
+                            if (ipcTotal > UP_limit_IPC)
+                                idle = true;
+                            else if ((ipcTotal <= UP_limit_IPC) && (ipcTotal >= LOW_limit_IPC))
+                                state = 5; // equal
+                            else if ((ipc_NCR < NCR_limit_IPC) && (ipc_CR >= CR_limit_IPC))
+                                state = 6; // worse ncr
+                            else if ((ipc_CR < CR_limit_IPC) && (ipc_NCR >= NCR_limit_IPC))
+                                state = 5; // worse cr
+                            else // NCR and CR worse
+                                state = 6; // worse all
+                            break;
+					}
+
+				}
 
 				/*switch (state)
 				{
@@ -1668,29 +1771,29 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}*/
 
 				// Leave time for actions to have effect
-				if(!idle & (effectIntervals > 0))
+				if (!idle & (effectIntervals > 0))
 					effectTime = true;
 
 				// State actions switch-case
-				if(idle)
+				if (idle)
 					LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
-				else
+				else if (partitionScheme == "ca")
 				{
-					switch ( state )
+					switch (state)
 					{
 						case 5:
 							LOGINF("NCR-- (Remove one shared way from CLOS with non-critical apps)");
 							maskNonCrCLOS = (maskNonCrCLOS >> 1) & maskNonCrCLOS;
 							if((maskNonCrCLOS == 0x00001) | (maskNonCrCLOS == 0x00000))
-								maskNonCrCLOS = 0x00002;
+								maskNonCrCLOS = 0x00003;
 							assert(maskNonCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
 							break;
 						case 6:
 							LOGINF("CR-- (Remove one shared way from CLOS with critical apps)");
 							maskCrCLOS = (maskCrCLOS << 1) & maskCrCLOS;
-							if((maskCrCLOS == 0x00001) | (maskCrCLOS == 0x00000))
-                            	maskCrCLOS = 0x00002;
+							if((maskCrCLOS == 0x10000) | (maskCrCLOS == 0x00000))
+                            	maskCrCLOS = 0x30000;
 							assert(maskCrCLOS != 0x00000);
 							LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 							break;
@@ -1707,19 +1810,43 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						default:
 							break;
 					}
+				}
+				else if (partitionScheme == "cad")
+				{
+					switch (state)
+					{
+						case 5:
+                        	LOGINF("NCR-- (Remove one shared way from CLOS with non-critical apps)");
+                            maskNonCrCLOS = (maskNonCrCLOS << 1) & maskNonCrCLOS;
+                            if ((maskNonCrCLOS == 0x10000) | (maskNonCrCLOS == 0x00000))
+                            	maskNonCrCLOS = 0x30000;
+                            assert(maskNonCrCLOS != 0x00000);
+                            LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
+                            break;
+						case 6:
+							LOGINF("NCR++ (Add one shared way to CLOS with non-critical apps)");
+                            if(maskNonCrCLOS != 0xfffff)
+								maskNonCrCLOS = (maskNonCrCLOS >> 1) | maskNonCrCLOS;
+                            LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
+                            break;
+						default:
+							break;
+					}
+				}
+
+				if (!idle)
+				{
 					num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
 					num_ways_CLOS_2 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(2));
 
-					LOGINF("COS 2 (CR)     has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
-					LOGINF("COS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
+					LOGINF("CLOS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
+					LOGINF("CLOS 2 (CR)     has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
 
 					int64_t aux_ns = (num_ways_CLOS_2 + num_ways_CLOS_1) - 20;
 					num_shared_ways = (aux_ns < 0) ? 0 : aux_ns;
 					LOGINF("Number of shared ways: {}"_format(num_shared_ways));
 					assert(num_shared_ways >= 0);
-
 				}
-
 			}
 		}
 	} //end first time
