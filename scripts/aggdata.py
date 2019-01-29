@@ -96,7 +96,10 @@ def read_and_merge(files, index, alone):
         df["slowdown"] = df["interval"] / alone
         df["stp"] = sum(df["progress"])
         df["antt"] = np.mean(df["slowdown"])
+
+        df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=["progress"], how="all")
         df["unfairness"] = df["progress"].std() / df["progress"].mean()
+        #print(df["progress"].mean())
         dfs.append(df)
 
     if len(dfs) == 0:
