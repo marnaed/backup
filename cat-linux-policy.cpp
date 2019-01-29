@@ -908,6 +908,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
         // Obtain stats per interval
         uint64_t l3_miss = task.stats.last("mem_load_uops_retired.l3_miss");
+		uint64_t mem_stalls = task.stats.last("cycle_activity.stalls_ldm_pending");
         uint64_t inst = task.stats.last("instructions");
         double ipc = task.stats.last("ipc");
         double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024 / 1024;
@@ -918,7 +919,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		mpkiL3Total += MPKIL3;
 		l3_occup_mb_total += l3_occup_mb;
 
-        LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,l3_occup_mb));
+        LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, LDM {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,mem_stalls,l3_occup_mb));
+
+		MPKIL3 = mem_stalls;
 
 		// Create tuples and add them to vectors
 		v_ipc.push_back(std::make_pair(taskID, ipc));
@@ -1519,7 +1522,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						assert((CLOSvalue >= 1) && (CLOSvalue <= 3));
 
 						// Check if there is a non-critical application occupying more space than it should
-						if ((l3_occup_mb_task > 2) & (CLOSvalue == 1) & (mpkil3Task < q2))
+						if ((l3_occup_mb_task > 3) & (CLOSvalue == 1) & (mpkil3Task < q2))
 						{
 							// Isolate it in a separate CLOS with two exclusive ways
 							uint64_t new_mask = 0x0000f;
