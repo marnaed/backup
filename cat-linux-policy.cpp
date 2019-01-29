@@ -1433,7 +1433,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
          	pid_t pidTask = std::get<1>(*it1);
 
-			if(outlierValue)
+			if (outlierValue)
 			{
                 LinuxBase::get_cat()->add_task(2,pidTask);
 				LOGINF("Task ID {} assigned to CLOS 2"_format(idTask));
@@ -1472,39 +1472,33 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			LOGINF("CLOSvalue = {}"_format(CLOSvalue));
 			assert((CLOSvalue >= 1) && (CLOSvalue <= 5));
 
-			if(outlierValue && (CLOSvalue % 2 != 0))
+			if (outlierValue && (CLOSvalue % 2 != 0))
             {
                 LOGINF("There is a new critical app (outlier {}, current CLOS {})"_format(outlierValue,CLOSvalue));
                 change_in_outliers = true;
 				status.push_back(std::make_pair(idTask,1));
 				ipc_critical_prev[idTask] = ipcTask;
             }
-			else if(!outlierValue && (CLOSvalue == 2))
+			else if (!outlierValue && (CLOSvalue == 2))
             {
             	LOGINF("There is a critical app that is no longer critical)");
                 change_in_outliers = true;
 				status.push_back(std::make_pair(idTask,0));
             }
-            else if(outlierValue)
+            else if (outlierValue)
 				ipc_CR += ipcTask;
             else
                 ipc_NCR += ipcTask;
         }
 
 		// Update configuration if there is a change in the number of critical apps
-        if(change_in_outliers)
-		{
-			//reset_configuration(tasklist);
+        if (change_in_outliers)
             update_configuration(taskIsInCRCLOS, status,prev_critical_apps,critical_apps);
-		}
 		else
         {
 			// If there is no new critical app, modify masks
-            if((critical_apps > 0) && (critical_apps < 4))
+            if ((critical_apps > 0) && (critical_apps < 4))
             {
-				/*uint64_t n_apps = 0;
-				double total_space = 0;
-
                 for (const auto &item : outlier)
                 {
                     idTask = std::get<0>(item);
@@ -1514,71 +1508,38 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					auto itT = std::find_if(v_l3_occup_mb.begin(), v_l3_occup_mb.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
 					double l3_occup_mb_task = std::get<1>(*itT);
 
-					if(outlierValue)
-					{
-						// Check if the occupancy of critical app(s) is close to the num. of ways assigned (>=85%)
-						// If not, perform no action (return)
-						if((critical_apps == 1) && (l3_occup_mb_task <= 0.85*num_ways_CLOS_2))
-						{
-							LOGINF("Task {} ONLY occupies {} when it has {} available --> RETURN"_format(idTask,l3_occup_mb_task,num_ways_CLOS_2));
-							return;
-						}
-						else if(critical_apps == 2)
-						{
-							total_space += l3_occup_mb_task;
-							n_apps += 1;
-							if(n_apps == 2 && (total_space <= 0.85*num_ways_CLOS_2))
-							{
-								LOGINF("ONLY occupied {} when there is {} available --> RETURN"_format(total_space,num_ways_CLOS_2));
-								return;
-							}
-						}
-						else if(critical_apps == 3)
-						{
-							total_space += l3_occup_mb_task;
-                            n_apps += 1;
-                            if(n_apps == 3 && (total_space <= 0.85*num_ways_CLOS_2))
-                            {
-                                LOGINF("ONLY occupied {} when there is {} available --> RETURN"_format(total_space,num_ways_CLOS_2));
-                                return;
-                            }
-						}
-					}
-				}*/
-					/*else if(!outlierValue && CLOS_key <= 3)
+					// Find MPKI-L3
+					auto itM = std::find_if(v_mpkil3.begin(), v_mpkil3.end(),[&idTask](const  auto& tuple) {return std::get<0>(tuple) == idTask;});
+              		double mpkil3Task = std::get<1>(*itM);
+
+					if (!outlierValue & (CLOS_key <= 3))
                     {
-                        auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&pidTask](const auto& tuple) {return std::get<0>(tuple) == pidTask;});
+                        auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
                         uint64_t CLOSvalue = std::get<1>(*it2);
 						assert((CLOSvalue >= 1) && (CLOSvalue <= 3));
 
 						// Check if there is a non-critical application occupying more space than it should
-						if((l3_occup_mb_task > 3) && (CLOSvalue == 1))
+						if ((l3_occup_mb_task > 2) & (CLOSvalue == 1) & (mpkil3Task < q2))
 						{
 							// Isolate it in a separate CLOS with two exclusive ways
-							uint64_t new_mask = clos_mask[CLOS_key];
-							LinuxBase::get_cat()->set_cbm(CLOS_key,new_mask);
-							LinuxBase::get_cat()->add_task(CLOSvalue,pidTask);
-							LOGINF("Task {} has l3_occup_mb {}, therefore it has been assigned to CLOS {} with mask {:x}"_format(pidTask,l3_occup_mb_task,CLOS_key,new_mask));
+							uint64_t new_mask = 0x0000f;
+							auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
+              				pid_t pidTask = std::get<1>(*it1);
 
-							// Remove 2 ways from CLOS 1 (hosting non-critical apps)
-							uint64_t new_mask_ncr = (maskNonCrCLOS << 2) & maskNonCrCLOS;
-							LOGINF("New mask of ncr clos: {:x}"_format(new_mask_ncr));
-							maskNonCrCLOS = new_mask_ncr;
-							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
-							num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
+							LinuxBase::get_cat()->set_cbm(CLOS_key,new_mask);
+							LinuxBase::get_cat()->add_task(CLOS_key,pidTask);
+							LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {} with mask {:x}"_format(idTask,l3_occup_mb_task,CLOS_key,new_mask));
 
 							// Update taskIsInCRCLOS
 							it2 = taskIsInCRCLOS.erase(it2);
-							taskIsInCRCLOS.push_back(std::make_pair(pidTask,CLOS_key));
+							taskIsInCRCLOS.push_back(std::make_pair(idTask,CLOS_key));
 
 							// Leave some idle intervals for apps to have time to ocuppy new space
-							idle = true;
-
-							CLOS_key += 2;
+							effectTime = true;
 						}
 					} // End if(outlierValue)
 
-				}*/ //End for loop
+				} //End for loop
 
 				//std::map<pid_t,double>::iterator itc;
 
