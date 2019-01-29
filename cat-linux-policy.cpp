@@ -836,6 +836,11 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 	num_shared_ways = 2;
 	LOGINF("[UPDATE] CLOS 1 (non-CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(1),num_ways_CLOS_1));
 	LOGINF("[UPDATE] CLOS 2 (CR) has mask {:#x} ({} ways)"_format(LinuxBase::get_cat()->get_cbm(2),num_ways_CLOS_2));
+
+	// Leave time for actions to have effect
+    if (!idle & (effectIntervals > 0))
+    	effectTime = true;
+
 }
 
 /*
