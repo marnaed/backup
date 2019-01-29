@@ -185,7 +185,7 @@ class CriticalAwareV2: public LinuxBase
     // dictionary with CLOSes and corresponding masks
 	// { 5, 0x0000C }
     std::map<uint64_t, uint64_t> clos_mask = {
-        { 3, 0x00003 }
+        { 3, 0xf0000 }
     };
 
 	bool reset = false;
