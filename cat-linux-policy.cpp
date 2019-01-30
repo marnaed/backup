@@ -1051,7 +1051,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	// If all values are smaller than 1
 	// Do not perform further action
-	/*bool no_change = true;
+	bool no_change = true;
 	for (const auto &item : v_mpkil3)
     {
     	double MPKIL3Task = std::get<1>(item);
@@ -1066,7 +1066,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			idle = true;
 			idle_count = 1;
 		}
-	}*/
+	}
 
 	// Check if current interval must be left idle
     if(idle | effectTime)
