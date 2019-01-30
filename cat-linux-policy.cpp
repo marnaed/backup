@@ -908,7 +908,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
         // Obtain stats per interval
         uint64_t l3_miss = task.stats.last("mem_load_uops_retired.l3_miss");
-		uint64_t mem_stalls = task.stats.last("cycle_activity.stalls_ldm_pending");
         uint64_t inst = task.stats.last("instructions");
         double ipc = task.stats.last("ipc");
         double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024 / 1024;
@@ -919,9 +918,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		mpkiL3Total += MPKIL3;
 		l3_occup_mb_total += l3_occup_mb;
 
-        LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, LDM {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,mem_stalls,l3_occup_mb));
+        LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,l3_occup_mb));
 
-		MPKIL3 = mem_stalls;
 
 		// Create tuples and add them to vectors
 		v_ipc.push_back(std::make_pair(taskID, ipc));
@@ -1115,24 +1113,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		}
         return;
     }
-
-	// Check values inside valid_mpkil3 deque are not more than double size
-	/*for (auto const &x : valid_mpkil3)
-	{
-		std::deque<double> val = x.second;
-		idTask = x.first;
-
-		// Check is windowSize is appropriate
-		if (non_critical[idTask] == 0)
-		{
-			while ((val.front() >= 2*val.back()) | (2*val.front() <= val.back()))
-				LOGINF("{} : remove large value from deque"_format(idTask));
-				val.pop_back();
-
-			valid_mpkil3[idTask] = val;
-		}
-
-	}*/
 
 	// Add values of MPKI-L3 from each app to the common set
 	for (auto const &x : valid_mpkil3)
@@ -1502,6 +1482,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			// If there is no new critical app, modify masks
             if ((critical_apps > 0) && (critical_apps < 4))
             {
+				uint64_t n_apps = 0;
                 for (const auto &item : outlier)
                 {
                     idTask = std::get<0>(item);
@@ -1525,13 +1506,12 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						if ((l3_occup_mb_task > 3) & (CLOSvalue == 1) & (mpkil3Task < q2))
 						{
 							// Isolate it in a separate CLOS with two exclusive ways
-							uint64_t new_mask = 0x0000f;
+							n_apps = n_apps + 1;
 							auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
               				pid_t pidTask = std::get<1>(*it1);
 
-							LinuxBase::get_cat()->set_cbm(CLOS_key,new_mask);
 							LinuxBase::get_cat()->add_task(CLOS_key,pidTask);
-							LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {} with mask {:x}"_format(idTask,l3_occup_mb_task,CLOS_key,new_mask));
+							LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(idTask,l3_occup_mb_task,CLOS_key));
 
 							// Update taskIsInCRCLOS
 							it2 = taskIsInCRCLOS.erase(it2);
@@ -1544,6 +1524,26 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 				} //End for loop
 
+				if (n_apps > 0)
+				{
+					uint64_t new_mask = 0xfffff;
+					switch(n_apps)
+					{
+						case 1:
+							new_mask = 0xc0000;
+							break;
+						case 2:
+							new_mask = 0xf0000;
+							break;
+						case 3:
+							new_mask = 0xfc000;
+							break;
+						default:
+							break;
+					}
+					LinuxBase::get_cat()->set_cbm(CLOS_key,new_mask);
+					LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_key,new_mask));
+				}
 				//std::map<pid_t,double>::iterator itc;
 
 				// Check if a NEW critical app is not making profitable use of the space
