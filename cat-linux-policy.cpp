@@ -1115,6 +1115,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     }
 
 	// Add values of MPKI-L3 from each app to the common set
+	double min = 1000000;
+	double maxM = 0;
 	for (auto const &x : valid_mpkil3)
 	{
 		// Get deque
@@ -1122,7 +1124,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		idTask = x.first;
 		std::string res;
 
-		if((reset) & (non_critical[idTask] == 0))
+		if ((reset) & (non_critical[idTask] == 0))
 		{
 			LOGINF("RESET -> Task {} has been CRITICAL THEREFORE ITS VALUES ARE NOT CONSIDERED"_format(idTask));
 			for (auto i = val.cbegin(); i != val.cend(); ++i)
@@ -1136,11 +1138,19 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				res = res + std::to_string(*i) + " ";
 				all_mpkil3.insert(*i);
 				macc(*i);
+
+				if (*i < min)
+					min = *i;
+				if (*i > maxM)
+					maxM = *i;
 			}
 		}
 		LOGINF(res);
 	}
 	reset = false;
+
+	double range = maxM - min;
+	LOGINF("RANGE: {}"_format(range));
 
 	/** LIMIT OUTLIER CALCULATION **/
 	uint64_t size = all_mpkil3.size();
