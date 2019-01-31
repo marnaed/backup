@@ -908,17 +908,20 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
         // Obtain stats per interval
         uint64_t l3_miss = task.stats.last("mem_load_uops_retired.l3_miss");
+		uint64_t l3_hit = task.stats.last("mem_load_uops_retired.l3_hit");
         uint64_t inst = task.stats.last("instructions");
         double ipc = task.stats.last("ipc");
         double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024 / 1024;
+
         double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
+		double HPKIL3 = (double)(l3_hit*1000) / (double)inst;
 
 		// Accumulate total values
 		ipcTotal += ipc;
 		mpkiL3Total += MPKIL3;
 		l3_occup_mb_total += l3_occup_mb;
 
-        LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,l3_occup_mb));
+        LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, HPKIL3 {}. l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,HPKIL3,l3_occup_mb));
 
 
 		// Create tuples and add them to vectors
