@@ -959,7 +959,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				LOGINF("{}: {} {} {}"_format(taskID,deque_aux[0],deque_aux[1],deque_aux[2]));
 
 				// Check middle value is not a spike
-				if (((deque_aux[1] >= 2*deque_aux[0]) & (deque_aux[1] >= 2*deque_aux[2])) | ((deque_aux[1] <= 0.5*deque_aux[0]) & (deque_aux[1] <= 0.5*deque_aux[2])))
+				if (((deque_aux[1] > deque_aux[0]) & (deque_aux[1] > deque_aux[2])) | ((deque_aux[1] < deque_aux[0]) & (deque_aux[1] < deque_aux[2])))
 				{
 					// Middle value is a spike -> remove middle value and insert last value to all_mpkil3
 					LOGINF("{}: SPIKE VALUE DETECTED!!"_format(taskID));
@@ -1492,7 +1492,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			// If there is no new critical app, modify masks
             if ((critical_apps > 0) && (critical_apps < 4))
             {
-				uint64_t n_apps = 0;
+				/*** LLC OCCUPANCY CONTROL MECANISM ***/
+				/*uint64_t n_apps = 0;
                 for (const auto &item : outlier)
                 {
                     idTask = std::get<0>(item);
@@ -1553,7 +1554,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					}
 					LinuxBase::get_cat()->set_cbm(CLOS_key,new_mask);
 					LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_key,new_mask));
-				}
+				}*/
 				//std::map<pid_t,double>::iterator itc;
 
 				// Check if a NEW critical app is not making profitable use of the space
