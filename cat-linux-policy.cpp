@@ -861,6 +861,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     auto v_ipc = std::vector<pairD_t>();
     auto v_l3_occup_mb = std::vector<pairD_t>();
 	auto v_mpkil3 = std::vector<pairD_t>();
+	auto v_hpkil3 = std::vector<pairD_t>();
 
 	// (std::string, double) vectors of tuples
 	auto v_limits = std::vector<pairSD_t>();
@@ -927,6 +928,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		// Create tuples and add them to vectors
 		v_ipc.push_back(std::make_pair(taskID, ipc));
         v_l3_occup_mb.push_back(std::make_pair(taskID, l3_occup_mb));
+		v_hpkil3.push_back(std::make_pair(taskID, HPKIL3));
         pid_CPU.push_back(std::make_pair(taskID, cpu));
 		id_pid.push_back(std::make_pair(taskID, taskPID));
 
@@ -1496,7 +1498,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
             if ((critical_apps > 0) && (critical_apps < 4))
             {
 				/*** LLC OCCUPANCY CONTROL MECANISM ***/
-				/*uint64_t n_apps = 0;
+				uint64_t n_apps = 0;
                 for (const auto &item : outlier)
                 {
                     idTask = std::get<0>(item);
@@ -1506,9 +1508,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					auto itT = std::find_if(v_l3_occup_mb.begin(), v_l3_occup_mb.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
 					double l3_occup_mb_task = std::get<1>(*itT);
 
-					// Find MPKI-L3
-					auto itM = std::find_if(v_mpkil3.begin(), v_mpkil3.end(),[&idTask](const  auto& tuple) {return std::get<0>(tuple) == idTask;});
-              		double mpkil3Task = std::get<1>(*itM);
+					// Find HPKI-L3
+					auto itH = std::find_if(v_hpkil3.begin(), v_hpkil3.end(),[&idTask](const  auto& tuple) {return std::get<0>(tuple) == idTask;});
+              		double hpkil3Task = std::get<1>(*itH);
 
 					if (!outlierValue & (CLOS_key <= 3))
                     {
@@ -1517,7 +1519,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						assert((CLOSvalue >= 1) && (CLOSvalue <= 3));
 
 						// Check if there is a non-critical application occupying more space than it should
-						if ((l3_occup_mb_task > 3) & (CLOSvalue == 1) & (mpkil3Task < q2))
+						if ((l3_occup_mb_task > 3) & (CLOSvalue == 1) & (hpkil3Task < 1))
 						{
 							// Isolate it in a separate CLOS with two exclusive ways
 							n_apps = n_apps + 1;
@@ -1557,7 +1559,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					}
 					LinuxBase::get_cat()->set_cbm(CLOS_key,new_mask);
 					LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_key,new_mask));
-				}*/
+				}
+
 				//std::map<pid_t,double>::iterator itc;
 
 				// Check if a NEW critical app is not making profitable use of the space
