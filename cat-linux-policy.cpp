@@ -716,7 +716,7 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 	// >> assign CLOSes mask 0xfffff
 	// >> assign all apps to CLOS 1
 	if ((num_critical_new == 0) | (num_critical_new >= 4)){
-		for (int clos = 1; clos <= 3; clos += 1)
+		for (int clos = 1; clos <= 2; clos += 1)
 			LinuxBase::get_cat()->set_cbm(clos,0xfffff);
 
 		for (const auto &item : v)
@@ -771,21 +771,6 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
 			it2 = taskIsInCRCLOS.erase(it2);
 			taskIsInCRCLOS.push_back(std::make_pair(taskID,new_clos));
-		}
-		else
-		{
-			// Application has not suffered criticality change
-			// Return non-critical app(s) in CLOS 3 or 5 to CLOS 1
-			uint64_t clos_value = std::get<1>(item);
-			//if((clos_value == 3) | (clos_value == 5))
-			if(clos_value == 3)
-			{
-				LinuxBase::get_cat()->add_task(1,taskPID);
-				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
-				it2 = taskIsInCRCLOS.erase(it2);
-				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
-				LOGINF("[UPDATE] Task {} was in CLOS {} --> returned to CLOS 1"_format(taskID, clos_value));
-			}
 		}
 	}
 
@@ -893,6 +878,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     bool change_in_outliers = false;
 	uint32_t idTask;
 
+	bool change_isolated = false;
+
 	// Accumulator to calculate mean and std of mpkil3
 	ca_accum_t macc;
 
@@ -922,7 +909,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		mpkiL3Total += MPKIL3;
 		l3_occup_mb_total += l3_occup_mb;
 
-        LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, HPKIL3 {}. l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,HPKIL3,l3_occup_mb));
+        LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, HPKIL3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,HPKIL3,l3_occup_mb));
 
 
 		// Create tuples and add them to vectors
@@ -992,6 +979,25 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 							LOGINF("{}: New windowSize = {}"_format(taskID, windowSize));
 
 							clear_mpkil3[taskID] = 1;
+						}
+						else if ((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 3))
+						{
+							// If app. is not critical and isolated
+							// return it to CLOS 1
+							LinuxBase::get_cat()->add_task(1,taskPID);
+                			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+                			itT = taskIsInCRCLOS.erase(itT);
+                			taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+
+                			LOGINF("{}: NEW PHASE --> returned to CLOS 1"_format(taskID));
+							n_isolated_apps = n_isolated_apps - 1;
+
+                            mask_isolated = (mask_isolated >> 1) & mask_isolated;
+                            if (mask_isolated == 0x00000)
+                            	mask_isolated = 0x00001;
+							LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+							LOGINF("CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+
 						}
 						phase_count[taskID] += 1;
                         phase_duration[taskID] = 0;
@@ -1346,7 +1352,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     if (firstTime)
     {
     	// Set ways of CLOS 1 and 2
-        if(partitionScheme == "ca")
+        if (partitionScheme == "ca")
 		{
 			switch ( critical_apps )
         	{
@@ -1376,7 +1382,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                 	break;
 			} // close switch
 		}
-		else if(partitionScheme == "cad")
+		else if (partitionScheme == "cad")
 		{
 			maskCrCLOS = 0xfffff;
 			switch ( critical_apps )
@@ -1498,7 +1504,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
             if ((critical_apps > 0) && (critical_apps < 4))
             {
 				/*** LLC OCCUPANCY CONTROL MECANISM ***/
-				uint64_t n_apps = 0;
                 for (const auto &item : outlier)
                 {
                     idTask = std::get<0>(item);
@@ -1512,7 +1517,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					auto itH = std::find_if(v_hpkil3.begin(), v_hpkil3.end(),[&idTask](const  auto& tuple) {return std::get<0>(tuple) == idTask;});
               		double hpkil3Task = std::get<1>(*itH);
 
-					if (!outlierValue & (CLOS_key <= 3))
+					if (!outlierValue & (CLOS_isolated <= 3))
                     {
                         auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
                         uint64_t CLOSvalue = std::get<1>(*it2);
@@ -1522,16 +1527,17 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						if ((l3_occup_mb_task > 3) & (CLOSvalue == 1) & (hpkil3Task < 1))
 						{
 							// Isolate it in a separate CLOS with two exclusive ways
-							n_apps = n_apps + 1;
+							n_isolated_apps = n_isolated_apps + 1;
 							auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple)  == idTask;});
               				pid_t pidTask = std::get<1>(*it1);
 
-							LinuxBase::get_cat()->add_task(CLOS_key,pidTask);
-							LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(idTask,l3_occup_mb_task,CLOS_key));
+							LinuxBase::get_cat()->add_task(CLOS_isolated,pidTask);
+							LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(idTask,l3_occup_mb_task,CLOS_isolated));
+							change_isolated = true;
 
 							// Update taskIsInCRCLOS
 							it2 = taskIsInCRCLOS.erase(it2);
-							taskIsInCRCLOS.push_back(std::make_pair(idTask,CLOS_key));
+							taskIsInCRCLOS.push_back(std::make_pair(idTask,CLOS_isolated));
 
 							// Leave some idle intervals for apps to have time to ocuppy new space
 							effectTime = true;
@@ -1540,25 +1546,31 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 				} //End for loop
 
-				if (n_apps > 0)
+				if ((n_isolated_apps > 0) & (change_isolated))
 				{
-					uint64_t new_mask = 0xfffff;
-					switch(n_apps)
+					LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+					switch (n_isolated_apps)
 					{
 						case 1:
-							new_mask = 0xc0000;
+							mask_isolated = 0x00001;
 							break;
 						case 2:
-							new_mask = 0xf0000;
+							mask_isolated = 0x00003;
 							break;
 						case 3:
-							new_mask = 0xfc000;
+							mask_isolated = 0x00007;
+							break;
+						case 4:
+                            mask_isolated = 0x0000f;
+							break;
+						case 5:
+                            mask_isolated = 0x0001f;
 							break;
 						default:
 							break;
 					}
-					LinuxBase::get_cat()->set_cbm(CLOS_key,new_mask);
-					LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_key,new_mask));
+					LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+					LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 				}
 
 				//std::map<pid_t,double>::iterator itc;

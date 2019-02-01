@@ -182,12 +182,6 @@ class CriticalAwareV2: public LinuxBase
 	// number of times a task has been critical
     std::map<pid_t,uint64_t> frequencyCritical;
 
-    // dictionary with CLOSes and corresponding masks
-	// { 5, 0x0000C }
-    std::map<uint64_t, uint64_t> clos_mask = {
-        { 3, 0xf0000 }
-    };
-
 	bool reset = false;
 
 	std::map<uint64_t, double> non_critical = {
@@ -298,7 +292,9 @@ class CriticalAwareV2: public LinuxBase
 	// Maximum value of MPKI-L3 in the current interval
     double max_mpkil3 = 0;
 
-    uint64_t CLOS_key = 3;
+    uint64_t CLOS_isolated = 3;
+	uint64_t n_isolated_apps = 0;
+	uint64_t mask_isolated = 0x00001;
 
 	//dictinary holding previous value of critical apps
 	std::map<pid_t, double> ipc_critical_prev;
