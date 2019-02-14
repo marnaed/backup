@@ -904,12 +904,15 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
 		double HPKIL3 = (double)(l3_hit*1000) / (double)inst;
 
+		//double APKIL3 = HPKIL3 + MPKIL3;
+
 		// Accumulate total values
 		ipcTotal += ipc;
 		mpkiL3Total += MPKIL3;
 		l3_occup_mb_total += l3_occup_mb;
 
-        LOGINF("Task {} ({}): IPC {}, MPKI_L3 {}, HPKIL3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,HPKIL3,l3_occup_mb));
+        LOGINF("Task {} ({}): IPC {}, MPKIL3 {}, HPKIL3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,HPKIL3,l3_occup_mb));
+		//LOGINF("APKIL3 {}: {}"_format(taskID,APKIL3));
 
 
 		// Create tuples and add them to vectors
@@ -943,7 +946,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			deque_aux.push_front(MPKIL3);
 
 			// Increment phase duration counter
-			phase_duration[taskID] += 1;
+			//phase_duration[taskID] += 1;
 
 			double insert_value;
 			if (deque_aux.size() == 3)
@@ -951,7 +954,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				LOGINF("{}: {} {} {}"_format(taskID,deque_aux[0],deque_aux[1],deque_aux[2]));
 
 				// Check middle value is not a spike
-				if (((deque_aux[1] > deque_aux[0]) & (deque_aux[1] > deque_aux[2])) | ((deque_aux[1] < deque_aux[0]) & (deque_aux[1] < deque_aux[2])))
+				if (((deque_aux[1] > 1.5*deque_aux[0]) & (deque_aux[1] > 1.5*deque_aux[2])) | ((deque_aux[1] < (1/1.5)*deque_aux[0]) & (deque_aux[1] < (1/1.5)*deque_aux[2])))
 				{
 					// Middle value is a spike -> remove middle value and insert last value to all_mpkil3
 					LOGINF("{}: SPIKE VALUE DETECTED!!"_format(taskID));
@@ -962,6 +965,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				else
 				{
+					/*
 					// Check if last value is a spike value
 	                // Which means a new phase in comming
 					if ((deque_aux[2] >= 2*deque_aux[1]) | (deque_aux[2] <= 0.5*deque_aux[1]))
@@ -1001,12 +1005,63 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 						}
 						phase_count[taskID] += 1;
                         phase_duration[taskID] = 0;
+						sumXij[taskID] = 0;
 					}
-
+					*/
 					// Middle value is not a spike value
 					insert_value = deque_aux[2];
+					LOGINF("[ICOV] {}: mpkil3 inserted is {}"_format(taskID,insert_value));
+					sumXij[taskID] += insert_value;
+					phase_duration[taskID] += 1;
 					deque_valid.push_front(insert_value);
 					deque_aux.pop_back(); //remove value 2
+
+					// Calculate ICOV
+					if (phase_duration[taskID] > 1)
+					{
+						LOGINF("[ICOV] {}: Phase_duration = {}"_format(taskID, phase_duration[taskID]));
+                    	LOGINF("[ICOV] {}: sum {}, dur {}"_format(taskID,sumXij[taskID],phase_duration[taskID]));
+						double my_sum = sumXij[taskID] / phase_duration[taskID];
+                    	double prev_sum = (sumXij[taskID] - insert_value) / (phase_duration[taskID] - 1);
+						LOGINF("[ICOV] {}: my_sum {}, prev_sum {}"_format(taskID,my_sum,prev_sum));
+						double my_ICOV = fabs(ipc - prev_sum) / my_sum;
+						LOGINF("[ICOV] {}: my_icov = {}"_format(taskID,my_ICOV));
+
+						if (my_ICOV >= 0.25)
+						{
+							LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
+							clear_mpkil3[taskID] = 1;
+							phase_count[taskID] += 1;
+							phase_duration[taskID] = 0;
+							sumXij[taskID] = 0;
+
+							// Check if application is a critical application
+                          	auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+							if ((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 3))
+                          	{
+								// If app. is not critical and isolated
+                              	// return it to CLOS 1
+                              	LinuxBase::get_cat()->add_task(1,taskPID);
+                              	auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+                              	itT = taskIsInCRCLOS.erase(itT);
+                              	taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+
+                              	LOGINF("{}: NEW PHASE --> returned to CLOS 1"_format(taskID));
+                              	n_isolated_apps = n_isolated_apps - 1;
+
+                              	mask_isolated = (mask_isolated >> 1) & mask_isolated;
+                              	if (mask_isolated == 0x00000)
+                                  	mask_isolated = 0x00001;
+                              	LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+                              	LOGINF("CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+
+							}
+
+						}
+					}
+
+
+
 				}
 
 				// Add value to current mpkil3 vector
@@ -1043,6 +1098,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			valid_mpkil3[taskID] = std::deque<double>();
 			phase_count[taskID] = 1;
 			phase_duration[taskID] = 0;
+			sumXij[taskID] = MPKIL3;
 
 			// Add in vector in case this apps has been restarted
 			v_mpkil3.push_back(std::make_pair(taskID,MPKIL3));
