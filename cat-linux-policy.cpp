@@ -1019,15 +1019,14 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					// Calculate ICOV
 					if (phase_duration[taskID] > 1)
 					{
-						LOGINF("[ICOV] {}: Phase_duration = {}"_format(taskID, phase_duration[taskID]));
-                    	LOGINF("[ICOV] {}: sum {}, dur {}"_format(taskID,sumXij[taskID],phase_duration[taskID]));
+						LOGINF("[ICOV] {}: insert_value = {}"_format(taskID, insert_value));
 						double my_sum = sumXij[taskID] / phase_duration[taskID];
                     	double prev_sum = (sumXij[taskID] - insert_value) / (phase_duration[taskID] - 1);
 						LOGINF("[ICOV] {}: my_sum {}, prev_sum {}"_format(taskID,my_sum,prev_sum));
-						double my_ICOV = fabs(ipc - prev_sum) / my_sum;
+						double my_ICOV = fabs(insert_value - prev_sum) / my_sum;
 						LOGINF("[ICOV] {}: my_icov = {}"_format(taskID,my_ICOV));
 
-						if (my_ICOV >= 0.25)
+						if (my_ICOV >= 0.5)
 						{
 							LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
 							clear_mpkil3[taskID] = 1;
@@ -1046,12 +1045,12 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                               	itT = taskIsInCRCLOS.erase(itT);
                               	taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 
-                              	LOGINF("{}: NEW PHASE --> returned to CLOS 1"_format(taskID));
+                              	LOGINF("[TEST] {}: NEW PHASE --> returned to CLOS 1"_format(taskID));
                               	n_isolated_apps = n_isolated_apps - 1;
 
-                              	mask_isolated = (mask_isolated >> 1) & mask_isolated;
+                              	mask_isolated = (mask_isolated >> 2) & mask_isolated;
                               	if (mask_isolated == 0x00000)
-                                  	mask_isolated = 0x00001;
+                                  	mask_isolated = 0x00003;
                               	LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
                               	LOGINF("CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 
@@ -1608,19 +1607,19 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					switch (n_isolated_apps)
 					{
 						case 1:
-							mask_isolated = 0x00001;
-							break;
-						case 2:
 							mask_isolated = 0x00003;
 							break;
+						case 2:
+							mask_isolated = 0x0000f;
+							break;
 						case 3:
-							mask_isolated = 0x00007;
+							mask_isolated = 0x0003f;
 							break;
 						case 4:
-                            mask_isolated = 0x0000f;
+                            mask_isolated = 0x000ff;
 							break;
 						case 5:
-                            mask_isolated = 0x0001f;
+                            mask_isolated = 0x003ff;
 							break;
 						default:
 							break;
