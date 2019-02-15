@@ -911,6 +911,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
         double MPKIL3 = (double)(l3_miss*1000) / (double)inst;
 		double HPKIL3 = (double)(l3_hit*1000) / (double)inst;
+		double APKIL3 = MPKIL3 + HPKIL3;
 
 		//double APKIL3 = HPKIL3 + MPKIL3;
 
@@ -919,7 +920,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		mpkiL3Total += MPKIL3;
 		l3_occup_mb_total += l3_occup_mb;
 
-        LOGINF("Task {} ({}): IPC {}, MPKIL3 {}, HPKIL3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,HPKIL3,l3_occup_mb));
+        LOGINF("Task {} ({}): IPC {}, MPKIL3 {}, HPKIL3 {}, APKIL3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,HPKIL3,APKIL3,l3_occup_mb));
 		//LOGINF("APKIL3 {}: {}"_format(taskID,APKIL3));
 
 
@@ -1006,8 +1007,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					if (my_ICOV >= 0.5)
 					{
 						LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
-						phase_count[taskID] += 1;
-						phase_duration[taskID] = 0;
 						sumXij[taskID] = 0;
 						sacc[taskID] = ca_accum_t();
 
@@ -1032,6 +1031,18 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                             LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
                             LOGINF("CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 						}
+						else if ((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
+						{
+							if (phase_duration[taskID] <= 10)
+								windowSize = phase_duration[taskID];
+							else
+								windowSize = 10;
+							LOGINF("{}: windowSize changed to {}"_format(taskID,windowSize));
+							//window_change = true;
+						}
+
+						phase_count[taskID] += 1;
+                        phase_duration[taskID] = 0;
 
 						// Clear values of previous phase
                   		deque_valid.clear();
