@@ -923,7 +923,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         LOGINF("Task {} ({}): IPC {}, MPKIL3 {}, HPKIL3 {}, APKIL3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,HPKIL3,APKIL3,l3_occup_mb));
 		//LOGINF("APKIL3 {}: {}"_format(taskID,APKIL3));
 
-
 		// Create tuples and add them to vectors
 		v_ipc.push_back(std::make_pair(taskID, ipc));
         v_l3_occup_mb.push_back(std::make_pair(taskID, l3_occup_mb));
@@ -945,122 +944,127 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 			LOGINF("{}: MPKIL3 = {}"_format(taskID,MPKIL3));
 
-			// Check if MPKI-L3 is a spike value
-			/*double count_spike = acc::count(sacc[taskID]);
-			double limit_spike = 0;
+			sumXij[taskID] += MPKIL3;
+       		phase_duration[taskID] += 1;
 
-			if (count_spike > 0)
+		// Check if MPKI-L3 is a spike value
+		/*double count_spike = acc::count(sacc[taskID]);
+		double limit_spike = 0;
+
+		if (count_spike > 0)
+		{
+			double mean_spike = acc::mean(sacc[taskID]);
+			double var_spike = acc::variance(sacc[taskID]);
+			limit_spike = mean_spike + 3*std::sqrt(var_spike);
+			LOGINF("{}: limit_spike = {}"_format(taskID,limit_spike));
+			LOGINF("{}: MPKIL3 = {}"_format(taskID,MPKIL3));
+		}
+		else
+			LOGINF("{}: count_spike is 0!");
+
+		if ((count_spike > 0) & (MPKIL3 >= limit_spike))
+		{
+			LOGINF("{}: SPIKE VALUE DETECTED!!"_format(taskID));
+
+			// Get previous valid value of MPKI-L3 if no new values available
+			auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+			if(it_pm != v_mpkil3_prev.end())
+				v_mpkil3.push_back(std::make_pair(taskID,std::get<1>(*it_pm)));
+		}
+		else
+		if ((count_spike == 0) | (MPKIL3 < limit_spike))
+		{*/
+
+			// See if there is a phase change
+			// Calculate ICOV
+
+			/*if(phase_duration[taskID] == 1)
 			{
-				double mean_spike = acc::mean(sacc[taskID]);
-           	 	double var_spike = acc::variance(sacc[taskID]);
-            	limit_spike = mean_spike + 3*std::sqrt(var_spike);
-				LOGINF("{}: limit_spike = {}"_format(taskID,limit_spike));
-				LOGINF("{}: MPKIL3 = {}"_format(taskID,MPKIL3));
-			}
-			else
-				LOGINF("{}: count_spike is 0!");
-
-			if ((count_spike > 0) & (MPKIL3 >= limit_spike))
-            {
-            	LOGINF("{}: SPIKE VALUE DETECTED!!"_format(taskID));
-
-                // Get previous valid value of MPKI-L3 if no new values available
-                auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
-                if(it_pm != v_mpkil3_prev.end())
-            		v_mpkil3.push_back(std::make_pair(taskID,std::get<1>(*it_pm)));
-            }
-			else
-			if ((count_spike == 0) | (MPKIL3 < limit_spike))
-			{*/
-
-				// See if there is a phase change
-				// Calculate ICOV
-				sumXij[taskID] += MPKIL3;
-				phase_duration[taskID] += 1;
-
-				/*if(phase_duration[taskID] == 1)
-				{
-					LOGINF("{}: SPIKE VALUE DETECTED!!"_format(taskID));
+				LOGINF("{}: SPIKE VALUE DETECTED!!"_format(taskID));
                    	// Get previous valid value of MPKI-L3 if no new values available
                  	auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
                  	if(it_pm != v_mpkil3_prev.end())
                     v_mpkil3.push_back(std::make_pair(taskID,std::get<1>(*it_pm)));
 
 				}*/
-				if (phase_duration[taskID] > 2)
-                {
-					v_mpkil3.push_back(std::make_pair(taskID,MPKIL3));
 
-					// Add or update value to mpkil3_prev vector
-                 	auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
-                 	if (it_pm == v_mpkil3_prev.end())
-						v_mpkil3_prev.push_back(std::make_pair(taskID,MPKIL3));
-                	else
-                    	 std::get<1>(*it_pm) = MPKIL3;
+			// Add mpkil3 value
+			v_mpkil3.push_back(std::make_pair(taskID,MPKIL3));
 
-                	//LOGINF("[ICOV] {}: insert_value = {}"_format(taskID, MPKIL3));
-                   	double my_sum = sumXij[taskID] / phase_duration[taskID];
-                   	double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
-					double my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
-					LOGINF("[ICOV] {}: my_icov = {}"_format(taskID,my_ICOV));
+			// Add or update value to mpkil3_prev vector
+        	auto it_pm = std::find_if(v_mpkil3_prev.begin(), v_mpkil3_prev.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+        	if (it_pm == v_mpkil3_prev.end())
+				v_mpkil3_prev.push_back(std::make_pair(taskID,MPKIL3));
+        	else
+            	std::get<1>(*it_pm) = MPKIL3;
 
-					if (my_ICOV >= 0.5)
+			// Check if isolated app must be returned to CLOS 1
+			auto itX = std::find (id_isolated.begin(), id_isolated.end(), taskID);
+            if ((itX != id_isolated.end()) & (HPKIL3 > 1))
+            {
+                // If app. is not critical and isolated
+                // return it to CLOS 1 if it is higher than threshold
+                LinuxBase::get_cat()->add_task(1,taskPID);
+                auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+                itT = taskIsInCRCLOS.erase(itT);
+                taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+
+                LOGINF("[TEST] {}: HPKIL3 higher than 1 --> return to CLOS 1"_format(taskID));
+                n_isolated_apps = n_isolated_apps - 1;
+                LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+
+                mask_isolated = (mask_isolated >> 2) & mask_isolated;
+                if (mask_isolated == 0x00000)
+                    mask_isolated = 0x00003;
+                LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+                LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+
+                id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+            }
+
+
+        	if (phase_duration[taskID] > 1)
+        	{
+				// Calculate ICOV
+                double my_sum = sumXij[taskID] / phase_duration[taskID];
+                double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
+				double my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
+				LOGINF("[ICOV] {}: my_icov = {}"_format(taskID,my_ICOV));
+
+				// New phase detection
+				if (my_ICOV >= 0.5)
+				{
+					auto itZ = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+					LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
+					sumXij[taskID] = 0;
+					sacc[taskID] = ca_accum_t();
+
+					// Change window size if app is critical
+					if ((itZ != taskIsInCRCLOS.end()) && (std::get<1>(*itZ) == 2))
 					{
-						LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
-						sumXij[taskID] = 0;
-						sacc[taskID] = ca_accum_t();
-
-						// Check if application is a critical application
-					   	auto itX = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
-						if ((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 3))
-						{
-							// If app. is not critical and isolated
-                            // return it to CLOS 1
-                            LinuxBase::get_cat()->add_task(1,taskPID);
-                            auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
-                            itT = taskIsInCRCLOS.erase(itT);
-
-							taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
-
-                            LOGINF("[TEST] {}: NEW PHASE --> returned to CLOS 1"_format(taskID));
-                            n_isolated_apps = n_isolated_apps - 1;
-
-                            mask_isolated = (mask_isolated >> 2) & mask_isolated;
-                            if (mask_isolated == 0x00000)
-                                mask_isolated = 0x00003;
-                            LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
-                            LOGINF("CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
-						}
-						else if ((itX != taskIsInCRCLOS.end()) && (std::get<1>(*itX) == 2))
-						{
-							if (phase_duration[taskID] <= 10)
-								windowSize = phase_duration[taskID];
-							else
-								windowSize = 10;
-							LOGINF("{}: windowSize changed to {}"_format(taskID,windowSize));
-							//window_change = true;
-						}
-
-						phase_count[taskID] += 1;
-                        phase_duration[taskID] = 0;
-
-						// Clear values of previous phase
-                  		deque_valid.clear();
-                  		LOGINF("{}: deque_valid has been cleared as a new phase is starting."_format(taskID));
-
+						if (phase_duration[taskID] <= 10)
+							windowSize = phase_duration[taskID];
+						else
+							windowSize = 10;
+						LOGINF("{}: windowSize changed to {}"_format(taskID,windowSize));
 					}
 
-					// Add to valid_mpkil3 queue
-                	deque_valid.push_front(MPKIL3);
+					phase_count[taskID] += 1;
+                    phase_duration[taskID] = 0;
 
-  	               	// Accumulate value to phase average MPKI-L3
-                 	ca_accum_t auxSacc = sacc[taskID];
-                 	auxSacc(MPKIL3);
-                	sacc[taskID] = auxSacc;
+					// Clear values of previous phase
+                  	deque_valid.clear();
+                  	LOGINF("{}: deque_valid has been cleared as a new phase is starting."_format(taskID));
 				}
+			}
 
+			// Accumulate value to phase average MPKI-L3
+            ca_accum_t auxSacc = sacc[taskID];
+            auxSacc(MPKIL3);
+            sacc[taskID] = auxSacc;
 
-			//}
+			// Add to valid_mpkil3 queue
+            deque_valid.push_front(MPKIL3);
 
 			// Store queue modified in the dictionary
 			valid_mpkil3[taskID] = deque_valid;
@@ -1079,7 +1083,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
            	ca_accum_t auxSacc = sacc[taskID];
 			auxSacc(MPKIL3);
            	sacc[taskID] = auxSacc;
-
 
 			// Add in vector in case this apps has been restarted
 			v_mpkil3.push_back(std::make_pair(taskID,MPKIL3));
@@ -1576,6 +1579,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 							// Update taskIsInCRCLOS
 							it2 = taskIsInCRCLOS.erase(it2);
 							taskIsInCRCLOS.push_back(std::make_pair(idTask,CLOS_isolated));
+
+							id_isolated.push_back(idTask);
 
 							// Leave some idle intervals for apps to have time to ocuppy new space
 							effectTime = true;
