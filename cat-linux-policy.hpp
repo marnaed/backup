@@ -178,6 +178,7 @@ class CriticalAwareV2: public LinuxBase
     std::vector<pair_t> pid_CPU;
 	std::vector<pairD_t> v_mpkil3_prev;
 	std::vector<pair32P_t> id_pid;
+	std::vector<uint32_t> id_isolated;
 
 	// number of times a task has been critical
     std::map<pid_t,uint64_t> frequencyCritical;
@@ -319,10 +320,16 @@ class CriticalAwareV2: public LinuxBase
     typedef acc::accumulator_set<
         double, acc::stats<
             acc::tag::mean,
-            acc::tag::variance
+            acc::tag::variance,
+			acc::tag::count
         >
     >
     ca_accum_t;
+
+	// Accumulator to detect spike values in  mpkil3
+    //ca_accum_t sacc;
+
+	std::map<uint32_t, ca_accum_t> sacc;
 
     public:
 
