@@ -207,6 +207,18 @@ class CriticalAwareV2: public LinuxBase
         { 7, 0 }
      };
 
+	// Map of windowSizes
+	std::map<uint64_t, double> windowSizeM = {
+          { 0, windowSize },
+          { 1, windowSize },
+          { 2, windowSize },
+          { 3, windowSize },
+          { 4, windowSize },
+          { 5, windowSize },
+          { 6, windowSize },
+          { 7, windowSize }
+    };
+
 
 
 	// Table with values of Kn
@@ -304,13 +316,16 @@ class CriticalAwareV2: public LinuxBase
 	double excluded_application_ipc;
 
 	// dictionary holding deque with 3 last MPKIL3 values for each task
-	std::map<uint32_t, std::deque<double>> deque_mpkil3;
-	// dictionary holding up to 10 last MPKIL3 valid (non-spike) values
+	//std::map<uint32_t, std::deque<double>> deque_mpkil3;
+
+	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
 	std::map<uint32_t, std::deque<double>> valid_mpkil3;
 
+	// dictionaries holdind phase info for each task
 	std::map<uint32_t, uint64_t> phase_count;
 	std::map<uint32_t, uint64_t> phase_duration;
 
+	// dictionary holding sum of MPKIL3 of each application during a given phase
 	std::map<uint32_t, double> sumXij;
 
 	// number of times consecutive critical_apps = 0 detected
@@ -326,10 +341,8 @@ class CriticalAwareV2: public LinuxBase
     >
     ca_accum_t;
 
-	// Accumulator to detect spike values in  mpkil3
-    //ca_accum_t sacc;
-
-	std::map<uint32_t, ca_accum_t> sacc;
+	// Dictionary of accumulators to detect spike values in the mpkil3
+	//std::map<uint32_t, ca_accum_t> sacc;
 
     public:
 
