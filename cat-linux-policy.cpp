@@ -906,6 +906,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         uint64_t l3_miss = task.stats.last("mem_load_uops_retired.l3_miss");
 		uint64_t l3_hit = task.stats.last("mem_load_uops_retired.l3_hit");
         uint64_t inst = task.stats.last("instructions");
+		uint64_t cycles = task.stats.last("cycles");
         double ipc = task.stats.last("ipc");
         double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024 / 1024;
 
@@ -913,7 +914,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		double HPKIL3 = (double)(l3_hit*1000) / (double)inst;
 		double APKIL3 = MPKIL3 + HPKIL3;
 
-		//double APKIL3 = HPKIL3 + MPKIL3;
+		double APKCL3 = (double)((l3_miss + l3_hit)*1000) / cycles;
+		LOGINF("{}: APKCL3 = {}"_format(taskID,APKCL3));
 
 		// Accumulate total values
 		ipcTotal += ipc;
@@ -1023,7 +1025,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
             }
 
 
-        	if (phase_duration[taskID] > 1)
+        	if (((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)))
         	{
 				// Calculate ICOV
                 double my_sum = sumXij[taskID] / phase_duration[taskID];
@@ -1047,7 +1049,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					else
 						windowSizeM[taskID] = 10;
 
-					LOGINF("{}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
+					LOGINF("[DEBB] {}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
 					//}
 
 					phase_count[taskID] += 1;
