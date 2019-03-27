@@ -307,7 +307,7 @@ class CriticalAwareV2: public LinuxBase
 
     uint64_t CLOS_isolated = 3;
 	uint64_t n_isolated_apps = 0;
-	uint64_t mask_isolated = 0x00001;
+	uint64_t mask_isolated = 0x00003;
 
 	//dictinary holding previous value of critical apps
 	std::map<pid_t, double> ipc_critical_prev;
