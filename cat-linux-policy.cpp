@@ -905,7 +905,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         uint64_t l3_miss = task.stats.last("mem_load_uops_retired.l3_miss");
 		uint64_t l3_hit = task.stats.last("mem_load_uops_retired.l3_hit");
         uint64_t inst = task.stats.last("instructions");
-		uint64_t cycles = task.stats.last("cycles");
+		//uint64_t cycles = task.stats.last("cycles");
         double ipc = task.stats.last("ipc");
         double l3_occup_mb = task.stats.last("intel_cqm/llc_occupancy/") / 1024 / 1024;
 
@@ -955,60 +955,61 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
             	std::get<1>(*it_pm) = MPKIL3;
 
 			// Check if there is a non-critical application occupying more space than it should
-            auto it3 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
-			if (it3 != taskIsInCRCLOS.end())
+			// or if an isolated app must be returned to CLOS 1
+			auto itX = std::find (id_isolated.begin(), id_isolated.end(), taskID);
+            if ((itX != id_isolated.end()) & (HPKIL3 > 1))
+            {
+                // If app. is not critical and isolated
+                // return it to CLOS 1 if it is higher than threshold
+                LinuxBase::get_cat()->add_task(1,taskPID);
+                auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+        		itT = taskIsInCRCLOS.erase(itT);
+        		taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+
+				LOGINF("[TEST] {}: HPKIL3 higher than 1 --> return to CLOS 1"_format(taskID));
+                n_isolated_apps = n_isolated_apps - 1;
+        		LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+
+                mask_isolated = (mask_isolated >> 2) & mask_isolated;
+                if (mask_isolated == 0x00000)
+                    mask_isolated = 0x00003;
+                LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+                LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+                id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+            }
+			else if (itX == id_isolated.end())
 			{
-				uint64_t CLOSvalue = std::get<1>(*it3);
-           		assert((CLOSvalue >= 1) && (CLOSvalue <= 3));
-				if ((l3_occup_mb > 3) & (CLOSvalue == 1) & (HPKIL3 < 1))
-            	{
-           			// Isolate it in a separate CLOS with two exclusive ways
-                	n_isolated_apps = n_isolated_apps + 1;
-					LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
-					if (n_isolated_apps == 1)
-						mask_isolated = 0x00003;
-					else if(mask_isolated != 0xfffff)
-						mask_isolated = (mask_isolated << 2) | mask_isolated;
-
-					LinuxBase::get_cat()->add_task(3,taskPID);
-					LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(taskID,l3_occup_mb,CLOS_isolated));
-					LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
-                	LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
-
-					// Update taskIsInCRCLOS
-					it3 = taskIsInCRCLOS.erase(it3);
-					taskIsInCRCLOS.push_back(std::make_pair(taskID,CLOS_isolated));
-					id_isolated.push_back(taskID);
-
-					// Leave some idle intervals for apps to have time to ocuppy new space
-					//effectTime = true;
-				}
-            	else
+				// Check if there is a non-critical application occupying more space than it should
+              	auto it3 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+              	if (it3 != taskIsInCRCLOS.end())
 				{
-					// Check if isolated app must be returned to CLOS 1
-					auto itX = std::find (id_isolated.begin(), id_isolated.end(), taskID);
-            		if ((itX != id_isolated.end()) & (HPKIL3 > 1))
-            		{
-                		// If app. is not critical and isolated
-                		// return it to CLOS 1 if it is higher than threshold
-                		LinuxBase::get_cat()->add_task(1,taskPID);
-                		auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
-                		itT = taskIsInCRCLOS.erase(itT);
-                		taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+					uint64_t CLOSvalue = std::get<1>(*it3);
+                  	assert((CLOSvalue >= 1) && (CLOSvalue <= 3));
+                 	if ((l3_occup_mb > 3) & (CLOSvalue == 1) & (HPKIL3 < 1))
+                  	{
+                      	// Isolate it in a separate CLOS with two exclusive ways
+                      	n_isolated_apps = n_isolated_apps + 1;
+                      	LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+                      	if (n_isolated_apps == 1)
+                          	mask_isolated = 0x00003;
+                      	else if(mask_isolated != 0xfffff)
+                          	mask_isolated = (mask_isolated << 2) | mask_isolated;
 
-                		LOGINF("[TEST] {}: HPKIL3 higher than 1 --> return to CLOS 1"_format(taskID));
-                		n_isolated_apps = n_isolated_apps - 1;
-                		LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+                      	LinuxBase::get_cat()->add_task(3,taskPID);
+                      	LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(taskID,l3_occup_mb,CLOS_isolated));
+                      	LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+                      	LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 
-                		mask_isolated = (mask_isolated >> 2) & mask_isolated;
-                		if (mask_isolated == 0x00000)
-                    		mask_isolated = 0x00003;
-                		LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
-                		LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+                      	// Update taskIsInCRCLOS
+                      	it3 = taskIsInCRCLOS.erase(it3);
+                      	taskIsInCRCLOS.push_back(std::make_pair(taskID,CLOS_isolated));
+                      	id_isolated.push_back(taskID);
 
-                		id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
-            		}
+                      	// Leave some idle intervals for apps to have time to ocuppy new space
+                      	//effectTime = true;
+					}
 				}
+
 			}
 
         	if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
