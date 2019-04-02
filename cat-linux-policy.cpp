@@ -707,8 +707,8 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 	// CLOS_key = 3;
 
 	idle = false;
-	idle_count = IDLE_INTERVALS;
-	effect_count = effectIntervals;
+	idle_count = effectIntervals;
+	//effect_count = effectIntervals;
 
 	LOGINF("[UPDATE] From {} ways to {} ways"_format(num_critical_old,num_critical_new));
 
@@ -824,7 +824,7 @@ void CriticalAwareV2::update_configuration(std::vector<pair_t> v, std::vector<pa
 
 	// Leave time for actions to have effect
     if (!idle & (effectIntervals > 0))
-    	effectTime = true;
+    	idle = true;
 
 }
 
@@ -867,6 +867,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
     /** VARIABLES **/
     double ipcTotal = 0;
 	double mpkiL3Total = 0;
+	double hpkiL3Total = 0;
 	double l3_occup_mb_total = 0;
     // Total IPC of critical applications
 	double ipc_CR = 0;
@@ -919,6 +920,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 		// Accumulate total values
 		ipcTotal += ipc;
 		mpkiL3Total += MPKIL3;
+		hpkiL3Total += HPKIL3;
 		l3_occup_mb_total += l3_occup_mb;
 
         LOGINF("Task {} ({}): IPC {}, MPKIL3 {}, HPKIL3 {}, APKIL3 {}, l3_occup_mb {}"_format(taskName,taskID,ipc,MPKIL3,HPKIL3,APKIL3,l3_occup_mb));
@@ -1004,9 +1006,6 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                       	it3 = taskIsInCRCLOS.erase(it3);
                       	taskIsInCRCLOS.push_back(std::make_pair(taskID,CLOS_isolated));
                       	id_isolated.push_back(taskID);
-
-                      	// Leave some idle intervals for apps to have time to ocuppy new space
-                      	//effectTime = true;
 					}
 				}
 
@@ -1018,7 +1017,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
                 double my_sum = sumXij[taskID] / phase_duration[taskID];
                 double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
 				double my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
-				LOGINF("[ICOV] {}: my_icov = {}"_format(taskID,my_ICOV));
+				LOGINF("{}: my_icov = {}"_format(taskID,my_ICOV));
 
 				// New phase detection
 				if (my_ICOV >= 0.5)
@@ -1031,7 +1030,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					else
 						windowSizeM[taskID] = 10;
 
-					LOGINF("[DEBB] {}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
+					LOGINF("{}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
 
 					phase_count[taskID] += 1;
                     phase_duration[taskID] = 0;
@@ -1078,7 +1077,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	// If all values are smaller than 1
 	// Do not perform further action
-	bool no_change = true;
+	/*bool no_change = true;
 	for (const auto &item : v_mpkil3)
     {
     	double MPKIL3Task = std::get<1>(item);
@@ -1093,10 +1092,10 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			idle = true;
 			idle_count = 1;
 		}
-	}
+	}*/
 
 	// Check if current interval must be left idle
-    if(idle | effectTime)
+    if(idle)
     {
 		for (const auto &item : taskIsInCRCLOS)
       	{
@@ -1124,19 +1123,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         	if (idle_count == 0)
         	{
             	idle = false;
-            	idle_count = IDLE_INTERVALS;
+            	idle_count = effectIntervals;
         	}
-		}
-
-		if (effectTime)
-		{
-			LOGINF("Effect interval {}"_format(effect_count));
-			effect_count = effect_count - 1;
-			if (effect_count == 0)
-			{
-				effectTime = false;
-				effect_count = effectIntervals;
-			}
 		}
         return;
     }
@@ -1299,6 +1287,9 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
         int freqCritical = -1;
         double fractionCritical = 0;
 
+		auto itH = std::find_if(v_hpkil3.begin(), v_hpkil3.end(),[&idTask](const  auto& tuple) {return std::get<0>(tuple) == idTask;});
+        double hpkil3Task = std::get<1>(*itH);
+
         if (current_interval > firstInterval)
         {
             // Search for mi tuple and update the value
@@ -1325,11 +1316,13 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 			res += std::to_string(idTask) + " ";
 
         }
-        else if ((MPKIL3Task < limit_outlier) && (fractionCritical >= 0.5))
+        else if ((MPKIL3Task < limit_outlier) && ( hpkil3Task >= (hpkiL3Total/3) ))
         {
 			LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since   {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
-            LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask, fractionCritical));
-            outlier.push_back(std::make_pair(idTask,1));
+            //LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask, fractionCritical));
+			LOGINF("HPKI_L3 of {} is {} (> {}) --> CRITICAL"_format(idTask, hpkil3Task, hpkiL3Total/3));
+            //LOGINF("HPKIL3 of {} is {} > {} --> CRITICAL"_format(idTask, HPKIL3, hpkiL3Total));
+			outlier.push_back(std::make_pair(idTask,1));
             critical_apps += 1;
 			res += std::to_string(idTask) + " ";
         }
@@ -1440,6 +1433,8 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 
         LOGINF("CLOS 2 (CR) now has mask {:#x}"_format(maskCrCLOS));
         LOGINF("CLOS 1 (non-CR) now has mask {:#x}"_format(maskNonCrCLOS));
+
+		idle = true;
 
 		assert(num_shared_ways >= 0);
 
@@ -1795,12 +1790,12 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}*/
 
 				// Leave time for actions to have effect
-				if (!idle & (effectIntervals > 0))
-					effectTime = true;
+				//if (!idle & (effectIntervals > 0))
+				//	effectTime = true;
 
 				// State actions switch-case
 				if (idle)
-					LOGINF("New IPC is better or equal -> {} idle intervals"_format(IDLE_INTERVALS));
+					LOGINF("New IPC is better or equal -> {} idle intervals"_format(effectIntervals));
 				else if (partitionScheme == "ca")
 				{
 					switch (state)
@@ -1870,6 +1865,7 @@ void CriticalAwareV2::apply(uint64_t current_interval, const tasklist_t &tasklis
 					num_shared_ways = (aux_ns < 0) ? 0 : aux_ns;
 					LOGINF("Number of shared ways: {}"_format(num_shared_ways));
 					assert(num_shared_ways >= 0);
+					idle = true;
 				}
 			}
 		}
