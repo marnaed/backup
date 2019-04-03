@@ -783,7 +783,7 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 
 	// Leave time for actions to have effect
     //if (!idle & (effectIntervals > 0))
-    //idle = true;
+    idle = true;
 
 }
 
@@ -1194,6 +1194,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 							break;
 
 					}
+
+					idle = true;
 
                     num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
                     num_ways_CLOS_2 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(2));
