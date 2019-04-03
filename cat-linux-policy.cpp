@@ -783,7 +783,7 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 
 	// Leave time for actions to have effect
     //if (!idle & (effectIntervals > 0))
-    //	idle = true;
+    //idle = true;
 
 }
 
@@ -856,7 +856,36 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		id_pid.clear();
 		return;
 	}
+	else if(idle)
+    {
+        for (const auto &item : taskIsInCRCLOS)
+      	{
+          	idTask = std::get<0>(item);
+			auto itIPC = std::find_if(v_ipc.begin(), v_ipc.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
+            double ipcTask = std::get<1>(*itIPC);
 
+			if (std::get<1>(item) == 1)
+				ipc_NCR += ipcTask;
+			else if (std::get<1>(item) == 2)
+				ipc_CR += ipcTask;
+		}
+
+		ipc_CR_prev = ipc_CR;
+      	ipc_NCR_prev = ipc_NCR;
+
+      	// Assign total IPC of this interval to previous value
+      	expectedIPCtotal = ipcTotal;
+      	id_pid.clear();
+
+		LOGINF("Idle interval {}"_format(idle_count));
+        idle_count = idle_count - 1;
+        if(idle_count == 0)
+        {
+        	idle = false;
+            idle_count = IDLE_INTERVALS;
+        }
+		return;
+	}
 
     // calculate total MPKIL3 mean of interval
 	double meanMPKIL3Total = mpkiL3Total / tasklist.size();
@@ -1052,18 +1081,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			//reset configuration if there is a change in critical apps
             if(change_in_outliers)
                 update_configuration(taskIsInCRCLOS, status, prev_critical_apps, critical_apps);
-
-			else if(idle)
-            {
-                LOGINF("Idle interval {}"_format(idle_count));
-                idle_count = idle_count - 1;
-                if(idle_count == 0)
-                {
-                    idle = false;
-                    idle_count = IDLE_INTERVALS;
-                }
-            }
-			else if(!idle)
+			else
 			{
                 // if there is no new critical app, modify mask if not done previously
                 if(critical_apps>0 && critical_apps<4)
