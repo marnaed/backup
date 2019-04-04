@@ -138,6 +138,7 @@ class CriticalAwareV3: public LinuxBase
     protected:
     uint64_t every = -1;
     uint64_t firstInterval = 1;
+	uint64_t IDLE_INTERVALS = 1;
 
     //Masks of CLOS
     uint64_t maskCrCLOS = 0xfffff;
@@ -158,7 +159,7 @@ class CriticalAwareV3: public LinuxBase
 
     bool firstTime = true;
 
-    uint64_t IDLE_INTERVALS = 5;
+    //uint64_t IDLE_INTERVALS = 5;
     uint64_t idle_count = IDLE_INTERVALS;
     bool idle = false;
 
@@ -187,7 +188,7 @@ class CriticalAwareV3: public LinuxBase
 
 	//typedef std::tuple<pid_t, uint64_t> pair_t
 
-    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval) : every(_every), firstInterval(_firstInterval), macc(acc::tag::rolling_window::window_size = 10u) {}
+    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _IDLE_INTERVALS) : every(_every), firstInterval(_firstInterval),IDLE_INTERVALS(_IDLE_INTERVALS), macc(acc::tag::rolling_window::window_size = 10u) {}
 
     virtual ~CriticalAwareV3() = default;
 

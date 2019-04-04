@@ -1012,8 +1012,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
             LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
             LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
 
-            LOGINF("COS 2 (CR) now has mask {:#x}"_format(maskCrCLOS));
-            LOGINF("COS 1 (non-CR) now has mask {:#x}"_format(maskNonCrCLOS));
+            LOGINF("CLOS 2 (CR) now has mask {:#x}"_format(maskCrCLOS));
+            LOGINF("CLOS 1 (non-CR) now has mask {:#x}"_format(maskNonCrCLOS));
 
 
             firstTime = 0;
