@@ -147,6 +147,7 @@ class CriticalAwareV3: public LinuxBase
     uint64_t num_ways_CLOS_1 = 20;
 	uint64_t prev_critical_apps = 0;
     int64_t num_shared_ways = 0;
+	uint64_t windowSize = 10;
 
     //Control of the changes made in the masks
     uint64_t state = 0;
@@ -159,20 +160,32 @@ class CriticalAwareV3: public LinuxBase
 
     bool firstTime = true;
 
-    //uint64_t IDLE_INTERVALS = 5;
+	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
+    std::map<uint32_t, std::deque<double>> valid_mpkil3;
+
+    // dictionaries holdind phase info for each task
+    std::map<uint32_t, uint64_t> phase_count;
+    std::map<uint32_t, uint64_t> phase_duration;
+
+    // dictionary holding sum of MPKIL3 of each application during a given phase
+    std::map<uint32_t, double> sumXij;
+	// Map of windowSizes
+    std::map<uint64_t, double> windowSizeM;
+
+
+
     uint64_t idle_count = IDLE_INTERVALS;
     bool idle = false;
 
 	// Define accumulators
-	typedef acc::accumulator_set<
-		double, acc::stats<
-			acc::tag::rolling_mean,
-			acc::tag::rolling_variance
-		>
-	>
-	ca_accum_t;
-
-	ca_accum_t macc;
+    typedef acc::accumulator_set<
+        double, acc::stats<
+            acc::tag::mean,
+            acc::tag::variance,
+            acc::tag::count
+        >
+    >
+    ca_accum_t;
 
     //vector to store if task is assigned to critical CLOS
 	typedef std::tuple<uint32_t, uint64_t> pair_t;
@@ -188,7 +201,7 @@ class CriticalAwareV3: public LinuxBase
 
 	//typedef std::tuple<pid_t, uint64_t> pair_t
 
-    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _IDLE_INTERVALS) : every(_every), firstInterval(_firstInterval),IDLE_INTERVALS(_IDLE_INTERVALS), macc(acc::tag::rolling_window::window_size = 10u) {}
+    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _IDLE_INTERVALS) : every(_every), firstInterval(_firstInterval),IDLE_INTERVALS(_IDLE_INTERVALS) {}
 
     virtual ~CriticalAwareV3() = default;
 
