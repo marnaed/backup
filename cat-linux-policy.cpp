@@ -930,7 +930,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		for (auto i = val.cbegin(); i != val.cend(); ++i)
 		{
 			res = res + std::to_string(*i) + " ";
-			all_mpkil3.insert(*i);
+			//all_mpkil3.insert(*i);
 			macc(*i);
 		}
 		LOGINF(res);
@@ -939,8 +939,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	/** Calculate limit outlier using 3std **/
 	double mean = acc::mean(macc);
 	double var = acc::variance(macc);
-	double limit_outlier = mean + 3*std::sqrt(var);
-	LOGINF("3std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
+	double limit_outlier = mean + 1.5*std::sqrt(var);
+	LOGINF("1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
 
 	//Check if MPKI-L3 of each APP is 2 stds o more higher than the mean MPKI-L3
     for (const auto &item : v_mpkil3)
