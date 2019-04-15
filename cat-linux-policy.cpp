@@ -867,6 +867,41 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			while (deque_valid.size() >= windowSizeM[taskID])
 				deque_valid.pop_back();
 
+			sumXij[taskID] += MPKIL3;
+       		phase_duration[taskID] += 1;
+
+			if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
+        	{
+				// Calculate ICOV
+                double my_sum = sumXij[taskID] / phase_duration[taskID];
+                double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
+				double my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
+				LOGINF("{}: my_icov = {}"_format(taskID,my_ICOV));
+
+				// New phase detection
+				if (my_ICOV >= 0.5)
+				{
+					LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
+					sumXij[taskID] = 0;
+
+					/*if (phase_duration[taskID] <= 10)
+						windowSizeM[taskID] = phase_duration[taskID];
+					else
+						windowSizeM[taskID] = 10;
+
+					LOGINF("{}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
+					*/
+
+					phase_count[taskID] += 1;
+                    phase_duration[taskID] = 0;
+
+					// Clear values of previous phase
+                  	deque_valid.clear();
+                  	LOGINF("{}: deque_valid has been cleared as a new phase is starting."_format(taskID));
+				}
+			}
+
+
 			// Add to valid_mpkil3 queue
             deque_valid.push_front(MPKIL3);
 
@@ -880,6 +915,9 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			valid_mpkil3[taskID].push_front(MPKIL3);
 			taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 			windowSizeM[taskID] = windowSize;
+			phase_count[taskID] = 1;
+			phase_duration[taskID] = 0;
+			sumXij[taskID] = MPKIL3;
         }
 	}
 
