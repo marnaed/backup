@@ -870,37 +870,43 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			sumXij[taskID] += MPKIL3;
        		phase_duration[taskID] += 1;
 
-			if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
-        	{
-				// Calculate ICOV
-                double my_sum = sumXij[taskID] / phase_duration[taskID];
-                double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
-				double my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
-				LOGINF("{}: my_icov = {}"_format(taskID,my_ICOV));
+			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+            uint64_t CLOSvalue = std::get<1>(*itT);
 
-				// New phase detection
-				if (my_ICOV >= 0.5)
-				{
-					LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
-					sumXij[taskID] = 0;
+			// Detect phase changes only in apps which are critical
+			if ( CLOSvalue == 2)
+			{
+				if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
+        		{
+					// Calculate ICOV
+                	double my_sum = sumXij[taskID] / phase_duration[taskID];
+                	double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
+					double my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
+					LOGINF("{}: my_icov = {}"_format(taskID,my_ICOV));
 
-					/*if (phase_duration[taskID] <= 10)
-						windowSizeM[taskID] = phase_duration[taskID];
-					else
-						windowSizeM[taskID] = 10;
+					// New phase detection
+					if (my_ICOV >= 0.5)
+					{
+						LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
+						sumXij[taskID] = 0;
 
-					LOGINF("{}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
-					*/
+						/*if (phase_duration[taskID] <= 10)
+							windowSizeM[taskID] = phase_duration[taskID];
+						else
+							windowSizeM[taskID] = 10;
 
-					phase_count[taskID] += 1;
-                    phase_duration[taskID] = 0;
+						LOGINF("{}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
+						*/
 
-					// Clear values of previous phase
-                  	deque_valid.clear();
-                  	LOGINF("{}: deque_valid has been cleared as a new phase is starting."_format(taskID));
+						phase_count[taskID] += 1;
+                    	phase_duration[taskID] = 0;
+
+						// Clear values of previous phase
+                  		deque_valid.clear();
+                  		LOGINF("{}: deque_valid has been cleared as a new phase is starting."_format(taskID));
+					}
 				}
 			}
-
 
 			// Add to valid_mpkil3 queue
             deque_valid.push_front(MPKIL3);
@@ -1087,6 +1093,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
             {
                 LinuxBase::get_cat()->add_task(2,pidTask);
 				LOGINF("Task ID {} assigned to CLOS 2"_format(idTask));
+				auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
+        		itT = taskIsInCRCLOS.erase(itT);
                 taskIsInCRCLOS.push_back(std::make_pair(idTask,2));
                 ipc_CR += ipcTask;
             }
@@ -1094,7 +1102,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
             {
 				LinuxBase::get_cat()->add_task(1,pidTask);
 				LOGINF("Task ID {} assigned to CLOS 1"_format(idTask));
-                taskIsInCRCLOS.push_back(std::make_pair(idTask,1));
                 ipc_NCR += ipcTask;
             }
         }
@@ -1113,6 +1120,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
 			uint64_t CLOSvalue = std::get<1>(*it2);
+			LOGINF("{}: CLOS {}"_format(idTask,CLOSvalue));
 			assert((CLOSvalue == 1) | (CLOSvalue == 2));
 
 
