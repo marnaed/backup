@@ -873,8 +873,61 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
             uint64_t CLOSvalue = std::get<1>(*itT);
 
+			/***********ISOLATION MECHANISM*************/
+			// Check if there is a non-critical application occupying more space than it should
+			// or if an isolated app must be returned to CLOS 1
+			if (current_interval > firstInterval)
+			{
+			auto itX = std::find (id_isolated.begin(), id_isolated.end(), taskID);
+            if ((itX != id_isolated.end()) & (HPKIL3 > 1))
+            {
+                // If app. is not critical and isolated
+                // return it to CLOS 1 if it is higher than threshold
+                LinuxBase::get_cat()->add_task(1,taskPID);
+        		itT = taskIsInCRCLOS.erase(itT);
+        		taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+
+				LOGINF("[TEST] {}: HPKIL3 higher than 1 --> return to CLOS 1"_format(taskID));
+                n_isolated_apps = n_isolated_apps - 1;
+        		LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+
+                mask_isolated = (mask_isolated >> 2) & mask_isolated;
+                if (mask_isolated == 0x00000)
+                    mask_isolated = 0x00003;
+                LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+                LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+                id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+            }
+			else if (itX == id_isolated.end())
+			{
+				// Check if there is a non-critical application occupying more space than it should
+                if ((l3_occup_mb > 3) & (CLOSvalue == 1) & (HPKIL3 < 1))
+                {
+                    // Isolate it in a separate CLOS with two exclusive ways
+                    n_isolated_apps = n_isolated_apps + 1;
+                    LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+                    if (n_isolated_apps == 1)
+                        mask_isolated = 0x00003;
+                    else if(mask_isolated != 0xfffff)
+                        mask_isolated = (mask_isolated << 2) | mask_isolated;
+
+                    LinuxBase::get_cat()->add_task(3,taskPID);
+                    LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(taskID,l3_occup_mb,CLOS_isolated));
+                    LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+                    LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+
+                    // Update taskIsInCRCLOS
+                    itT = taskIsInCRCLOS.erase(itT);
+                    taskIsInCRCLOS.push_back(std::make_pair(taskID,CLOS_isolated));
+                    id_isolated.push_back(taskID);
+				}
+			}
+			}
+			/*******************************************/
+
+			/***********PHASE DETECTION*****************/
 			// Detect phase changes only in apps which are critical
-			if ( CLOSvalue == 2)
+			/*if ( CLOSvalue == 2)
 			{
 				if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
         		{
@@ -890,13 +943,13 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
 						sumXij[taskID] = 0;
 
-						/*if (phase_duration[taskID] <= 10)
-							windowSizeM[taskID] = phase_duration[taskID];
-						else
-							windowSizeM[taskID] = 10;
+						//if (phase_duration[taskID] <= 10)
+						//	windowSizeM[taskID] = phase_duration[taskID];
+						//else
+						//	windowSizeM[taskID] = 10;
 
-						LOGINF("{}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
-						*/
+						//LOGINF("{}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
+
 
 						phase_count[taskID] += 1;
                     	phase_duration[taskID] = 0;
@@ -906,7 +959,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
                   		LOGINF("{}: deque_valid has been cleared as a new phase is starting."_format(taskID));
 					}
 				}
-			}
+			}*/
+			/*******************************************/
 
 			// Add to valid_mpkil3 queue
             deque_valid.push_front(MPKIL3);
@@ -1121,7 +1175,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
 			uint64_t CLOSvalue = std::get<1>(*it2);
 			LOGINF("{}: CLOS {}"_format(idTask,CLOSvalue));
-			assert((CLOSvalue == 1) | (CLOSvalue == 2));
+			assert((CLOSvalue == 1) | (CLOSvalue == 2) | (CLOSvalue == 3));
 
 
             if(outlierValue && (CLOSvalue % 2 != 0))

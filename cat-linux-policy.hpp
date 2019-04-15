@@ -147,7 +147,10 @@ class CriticalAwareV3: public LinuxBase
     uint64_t num_ways_CLOS_1 = 20;
 	uint64_t prev_critical_apps = 0;
     int64_t num_shared_ways = 0;
+
 	uint64_t windowSize = 10;
+
+	bool firstTime = true;
 
     //Control of the changes made in the masks
     uint64_t state = 0;
@@ -155,10 +158,14 @@ class CriticalAwareV3: public LinuxBase
     double ipc_CR_prev = 0;
     double ipc_NCR_prev = 0;
 
+	// Limit outlier calculation variables
     double mpkiL3Mean = 0;
 	double stdmpkiL3Mean = 0;
 
-    bool firstTime = true;
+	// Isolation mechanism variables
+	uint64_t CLOS_isolated = 3;
+    uint64_t n_isolated_apps = 0;
+    uint64_t mask_isolated = 0x00003;
 
 	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
     std::map<uint32_t, std::deque<double>> valid_mpkil3;
@@ -193,6 +200,7 @@ class CriticalAwareV3: public LinuxBase
 	typedef std::tuple<uint32_t, pid_t> pair32P_t;
     std::vector<pair_t> taskIsInCRCLOS;
 	std::vector<pair32P_t> id_pid;
+	std::vector<uint32_t> id_isolated;
 
 	// number of times a task has been critical
 	std::map<pid_t,uint64_t> frequencyCritical;
