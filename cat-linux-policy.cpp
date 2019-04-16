@@ -876,7 +876,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			/***********ISOLATION MECHANISM*************/
 			// Check if there is a non-critical application occupying more space than it should
 			// or if an isolated app must be returned to CLOS 1
-			if (current_interval > firstInterval)
+			if ((current_interval > firstInterval) | (critical_apps > 0))
 			{
 			auto itX = std::find (id_isolated.begin(), id_isolated.end(), taskID);
             if ((itX != id_isolated.end()) & (HPKIL3 > 1))
