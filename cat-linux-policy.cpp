@@ -798,6 +798,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
     // (Core, MPKI-L3) tuple
 	auto v_mpkil3 = std::vector<pairD_t>();
+	auto v_hpkil3 = std::vector<pairD_t>();
     auto v_ipc = std::vector<pairD_t>();
 	auto v_l3_occup_mb = std::vector<pairD_t>();
 
@@ -850,6 +851,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 		// Create tuples and add them to vectors
 		v_mpkil3.push_back(std::make_pair(taskID, MPKIL3));
+		v_hpkil3.push_back(std::make_pair(taskID, HPKIL3));
         v_ipc.push_back(std::make_pair(taskID, ipc));
 		id_pid.push_back(std::make_pair(taskID, taskPID));
 
@@ -1074,14 +1076,21 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			//LOGINF("Fraction Critical ({} / {}) = {}"_format(freqCritical,(current_interval-firstInterval),fractionCritical));
 		}
 
-        if (MPKIL3Task >= limit_outlier)
+		// Check if application is isolated
+		auto itX = std::find (id_isolated.begin(), id_isolated.end(), idTask);
+
+		// Find HPKIL3 value
+		auto itH = std::find_if(v_hpkil3.begin(), v_hpkil3.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
+        double HPKIL3Task = std::get<1>(*itH);
+
+        if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= 1))
         {
             LOGINF("The MPKI_L3 of task with id {} is an outlier, since {} >= {}"_format(idTask,MPKIL3Task,limit_outlier));
             outlier.push_back(std::make_pair(idTask,1));
             critical_apps = critical_apps + 1;
 			frequencyCritical[idTask]++;
-        }
-        else if(MPKIL3Task < limit_outlier && fractionCritical>=0.5)
+		}
+        else if((MPKIL3Task < limit_outlier) & (fractionCritical >= 0.5))
 		{
 			LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
 			LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
@@ -1091,7 +1100,12 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		else
         {
 			// it's not a critical app
-			LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
+			if (MPKIL3Task >= limit_outlier)
+				LOGINF("The HPKIL3 of task {} is too low ({}) to be considered critical"_format(idTask,HPKIL3Task));
+			else if (itX != id_isolated.end())
+				LOGINF("Isolated app {} cannot be considered as critical!"_format(idTask));
+			else
+				LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
             outlier.push_back(std::make_pair(idTask,0));
 			// initialize counter if it's the first interval
 			if(current_interval == firstInterval)
