@@ -709,7 +709,7 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 			auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
             pid_t taskPID = std::get<1>(*it1);
 
-			if (CLOS != 1)
+			if (CLOS == 2)
 			{
 				LinuxBase::get_cat()->add_task(1,taskPID);
 				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
@@ -718,7 +718,7 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 			}
 		}
 
-		LOGINF("[UPDATE] All tasks assigned to CLOS 1. TaskIsInCRCLOS updated");
+		LOGINF("[UPDATE] All critical tasks are assigned to CLOS 1. TaskIsInCRCLOS updated");
 		return;
 	}
 
@@ -912,6 +912,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
                 		id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
 						phase_count[taskID] += 1;
                         phase_duration[taskID] = 0;
+						excluded[taskID] = false;
 					}
 				}
             }
@@ -995,6 +996,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			phase_count[taskID] = 1;
 			phase_duration[taskID] = 0;
 			sumXij[taskID] = MPKIL3;
+			excluded[taskID]= false;
         }
 	}
 
@@ -1042,13 +1044,19 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		std::string res;
 
 		// Add values
-		for (auto i = val.cbegin(); i != val.cend(); ++i)
+		if (excluded[idTask] == false)
 		{
-			res = res + std::to_string(*i) + " ";
-			//all_mpkil3.insert(*i);
-			macc(*i);
+			for (auto i = val.cbegin(); i != val.cend(); ++i)
+			{
+				res = res + std::to_string(*i) + " ";
+				macc(*i);
+			}
+			LOGINF(res);
 		}
-		LOGINF(res);
+		else
+		{
+			LOGINF("Task {} is excluded!!!"_format(idTask));
+		}
 	}
 
 	/** Calculate limit outlier using 3std **/
@@ -1062,10 +1070,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
     {
         double MPKIL3Task = std::get<1>(item);
         idTask = std::get<0>(item);
-		int freqCritical = -1;
-		double fractionCritical = 0;
+		//int freqCritical = -1;
+		//double fractionCritical = 0;
 
-		if(current_interval > firstInterval)
+		/*if(current_interval > firstInterval)
 		{
 			//Search for mi tuple and update the value
 			auto it = frequencyCritical.find(idTask);
@@ -1074,7 +1082,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			assert(freqCritical>=0);
 			fractionCritical = freqCritical / (double)(current_interval-firstInterval);
 			//LOGINF("Fraction Critical ({} / {}) = {}"_format(freqCritical,(current_interval-firstInterval),fractionCritical));
-		}
+		}*/
 
 		// Check if application is isolated
 		auto itX = std::find (id_isolated.begin(), id_isolated.end(), idTask);
@@ -1088,12 +1096,14 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
             LOGINF("The MPKI_L3 of task with id {} is an outlier, since {} >= {}"_format(idTask,MPKIL3Task,limit_outlier));
             outlier.push_back(std::make_pair(idTask,1));
             critical_apps = critical_apps + 1;
-			frequencyCritical[idTask]++;
+			//frequencyCritical[idTask]++;
+			if (excluded[idTask] == true)
+				excluded[idTask] = false;
 		}
-        else if((MPKIL3Task < limit_outlier) & (fractionCritical >= 0.5))
+        else if((MPKIL3Task < limit_outlier) & (HPKIL3Task >= 1))
 		{
-			LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
-			LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
+			LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {} --> HPKIL3 high => CRITICAL"_format(idTask,MPKIL3Task,limit_outlier));
+			//LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
 			outlier.push_back(std::make_pair(idTask,1));
             critical_apps = critical_apps + 1;
 		}
@@ -1101,15 +1111,19 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
         {
 			// it's not a critical app
 			if (MPKIL3Task >= limit_outlier)
+			{
 				LOGINF("The HPKIL3 of task {} is too low ({}) to be considered critical"_format(idTask,HPKIL3Task));
+				if ((excluded[idTask] == false) & (itX != id_isolated.end()))
+					excluded[idTask] = true;
+			}
 			else if (itX != id_isolated.end())
 				LOGINF("Isolated app {} cannot be considered as critical!"_format(idTask));
 			else
 				LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
             outlier.push_back(std::make_pair(idTask,0));
 			// initialize counter if it's the first interval
-			if(current_interval == firstInterval)
-				frequencyCritical[idTask] = 0;
+			//if(current_interval == firstInterval)
+			//	frequencyCritical[idTask] = 0;
         }
     }
 

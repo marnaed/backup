@@ -179,7 +179,10 @@ class CriticalAwareV3: public LinuxBase
 	// Map of windowSizes
     std::map<uint64_t, double> windowSizeM;
 
-
+	// Set to true if app has HPKIL3 low and high MPKIL3
+	// In order for next interval to not contaminate
+	// set of MPKIL3 values
+	std::map<uint64_t, bool> excluded;
 
     uint64_t idle_count = IDLE_INTERVALS;
     bool idle = false;
