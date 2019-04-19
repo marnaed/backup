@@ -876,27 +876,42 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			/***********ISOLATION MECHANISM*************/
 			// Check if there is a non-critical application occupying more space than it should
 			// or if an isolated app must be returned to CLOS 1
-			if ((current_interval > firstInterval) | (critical_apps > 0))
+			if (current_interval > firstInterval)
 			{
 			auto itX = std::find (id_isolated.begin(), id_isolated.end(), taskID);
             if ((itX != id_isolated.end()) & (HPKIL3 > 1))
             {
-                // If app. is not critical and isolated
-                // return it to CLOS 1 if it is higher than threshold
-                LinuxBase::get_cat()->add_task(1,taskPID);
-        		itT = taskIsInCRCLOS.erase(itT);
-        		taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+				if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
+        		{
+					// Calculate ICOV
+                	double my_sum = sumXij[taskID] / phase_duration[taskID];
+                	double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
+					double my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
+					LOGINF("{}: my_icov = {}"_format(taskID,my_ICOV));
 
-				LOGINF("[TEST] {}: HPKIL3 higher than 1 --> return to CLOS 1"_format(taskID));
-                n_isolated_apps = n_isolated_apps - 1;
-        		LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+					// New phase detection
+					if (my_ICOV >= 0.5)
+					{
+                		// If app. is not critical and isolated
+                		// return it to CLOS 1 if it is higher than threshold
+                		LinuxBase::get_cat()->add_task(1,taskPID);
+        				itT = taskIsInCRCLOS.erase(itT);
+        				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 
-                mask_isolated = (mask_isolated >> 2) & mask_isolated;
-                if (mask_isolated == 0x00000)
-                    mask_isolated = 0x00003;
-                LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
-                LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
-                id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+						LOGINF("[TEST] {}: HPKIL3 higher than 1 --> return to CLOS 1"_format(taskID));
+                		n_isolated_apps = n_isolated_apps - 1;
+        				LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+
+                		mask_isolated = (mask_isolated >> 2) & mask_isolated;
+                		if (mask_isolated == 0x00000)
+                    		mask_isolated = 0x00003;
+                		LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+                		LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+                		id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+						phase_count[taskID] += 1;
+                        phase_duration[taskID] = 0;
+					}
+				}
             }
 			else if (itX == id_isolated.end())
 			{
