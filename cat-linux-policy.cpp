@@ -900,7 +900,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
         				itT = taskIsInCRCLOS.erase(itT);
         				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 
-						LOGINF("[TEST] {}: HPKIL3 higher than 1 --> return to CLOS 1"_format(taskID));
+						LOGINF("[TEST] {}: New phase detected --> return to CLOS 1"_format(taskID));
                 		n_isolated_apps = n_isolated_apps - 1;
         				LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
 
@@ -1110,7 +1110,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		else
         {
 			// it's not a critical app
-			if (MPKIL3Task >= limit_outlier)
+			if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < 1))
 			{
 				LOGINF("The HPKIL3 of task {} is too low ({}) to be considered critical"_format(idTask,HPKIL3Task));
 				if ((excluded[idTask] == false) & (itX != id_isolated.end()))
