@@ -1070,10 +1070,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
     {
         double MPKIL3Task = std::get<1>(item);
         idTask = std::get<0>(item);
-		//int freqCritical = -1;
-		//double fractionCritical = 0;
+		int freqCritical = -1;
+		double fractionCritical = 0;
 
-		/*if(current_interval > firstInterval)
+		if(current_interval > firstInterval)
 		{
 			//Search for mi tuple and update the value
 			auto it = frequencyCritical.find(idTask);
@@ -1082,7 +1082,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			assert(freqCritical>=0);
 			fractionCritical = freqCritical / (double)(current_interval-firstInterval);
 			//LOGINF("Fraction Critical ({} / {}) = {}"_format(freqCritical,(current_interval-firstInterval),fractionCritical));
-		}*/
+		}
 
 		// Check if application is isolated
 		auto itX = std::find (id_isolated.begin(), id_isolated.end(), idTask);
@@ -1096,14 +1096,14 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
             LOGINF("The MPKI_L3 of task with id {} is an outlier, since {} >= {}"_format(idTask,MPKIL3Task,limit_outlier));
             outlier.push_back(std::make_pair(idTask,1));
             critical_apps = critical_apps + 1;
-			//frequencyCritical[idTask]++;
+			frequencyCritical[idTask]++;
 			if (excluded[idTask] == true)
 				excluded[idTask] = false;
 		}
-        else if((MPKIL3Task < limit_outlier) & (HPKIL3Task >= 1))
+        else if((MPKIL3Task < limit_outlier) & (fractionCritical >= 0.5))
 		{
-			LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {} --> HPKIL3 high => CRITICAL"_format(idTask,MPKIL3Task,limit_outlier));
-			//LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
+			LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
+			LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
 			outlier.push_back(std::make_pair(idTask,1));
             critical_apps = critical_apps + 1;
 		}
@@ -1122,8 +1122,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
             outlier.push_back(std::make_pair(idTask,0));
 			// initialize counter if it's the first interval
-			//if(current_interval == firstInterval)
-			//	frequencyCritical[idTask] = 0;
+			if(current_interval == firstInterval)
+				frequencyCritical[idTask] = 0;
         }
     }
 
