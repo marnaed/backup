@@ -818,7 +818,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	double l3_occup_mb_total = 0;
 
 	uint32_t idTask;
-	double my_ICOV = 0;
 
 	// Accumulator to calculate mean and std of mpkil3
 	ca_accum_t macc;
@@ -876,81 +875,110 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
             uint64_t CLOSvalue = std::get<1>(*itT);
 
-			auto itX = std::find (id_isolated.begin(), id_isolated.end(), taskID);
-
-			if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
+			/***********ISOLATION MECHANISM*************/
+			// Check if there is a non-critical application occupying more space than it should
+			// or if an isolated app must be returned to CLOS 1
+			if (current_interval > firstInterval)
 			{
-				// Calculate ICOV
-				double my_sum = sumXij[taskID] / phase_duration[taskID];
-				double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
-				my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
-				LOGINF("{}: my_icov = {}"_format(taskID,my_ICOV));
-				// New phase detection
-				if (my_ICOV >= 0.5)
-				{
-					sumXij[taskID] = 0;
-					phase_count[taskID] += 1;
-					phase_duration[taskID] = 0;
-					excluded[taskID] = false;
+			auto itX = std::find (id_isolated.begin(), id_isolated.end(), taskID);
+            if ((itX != id_isolated.end()) & (HPKIL3 > 1))
+            {
+				if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
+        		{
+					// Calculate ICOV
+                	double my_sum = sumXij[taskID] / phase_duration[taskID];
+                	double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
+					double my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
+					LOGINF("{}: my_icov = {}"_format(taskID,my_ICOV));
 
-					/*******CRTICAL APPS*******/
-					if (CLOSvalue == 2)
+					// New phase detection
+					if (my_ICOV >= 0.5)
 					{
-						LOGINF("{}: Check if this app is still critical..."_format(taskID));
-						phase_change[taskID] = true;
-					}
-					/*************************/
-
-					/***ISOLATION MECHANISM***/
-					if ((itX != id_isolated.end()) & (HPKIL3 > 1))
-					{
-						// If app. is not critical and isolated
-						// return it to CLOS 1
-						LinuxBase::get_cat()->add_task(1,taskPID);
-						itT = taskIsInCRCLOS.erase(itT);
-						taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+                		// If app. is not critical and isolated
+                		// return it to CLOS 1 if it is higher than threshold
+                		LinuxBase::get_cat()->add_task(1,taskPID);
+        				itT = taskIsInCRCLOS.erase(itT);
+        				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 
 						LOGINF("[TEST] {}: New phase detected --> return to CLOS 1"_format(taskID));
-						n_isolated_apps = n_isolated_apps - 1;
-						LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+                		n_isolated_apps = n_isolated_apps - 1;
+        				LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
 
-						mask_isolated = (mask_isolated >> 2) & mask_isolated;
-						if (mask_isolated == 0x00000)
-							mask_isolated = 0x00003;
-						LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
-						LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
-						id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+                		mask_isolated = (mask_isolated >> 2) & mask_isolated;
+                		if (mask_isolated == 0x00000)
+                    		mask_isolated = 0x00003;
+                		LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+                		LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+                		id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+						phase_count[taskID] += 1;
+                        phase_duration[taskID] = 0;
+						excluded[taskID] = false;
 					}
-					/************************/
 				}
-			}
-
-			/***ISOLATION MECHANISM***/
-			if ( (current_interval >= firstInterval) & (itX == id_isolated.end()) )
+            }
+			else if (itX == id_isolated.end())
 			{
-				if ((l3_occup_mb > 3) & (CLOSvalue == 1) & (HPKIL3 < 1))
-				{
-					// Check if there is a non-critical application occupying more space than it should
-					// Isolate it in a separate CLOS with two exclusive ways
-					n_isolated_apps = n_isolated_apps + 1;
-					LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
-					if (n_isolated_apps == 1)
-						mask_isolated = 0x00003;
-					else if(mask_isolated != 0xfffff)
-						mask_isolated = (mask_isolated << 2) | mask_isolated;
+				// Check if there is a non-critical application occupying more space than it should
+                if ((l3_occup_mb > 3) & (CLOSvalue == 1) & (HPKIL3 < 1))
+                {
+                    // Isolate it in a separate CLOS with two exclusive ways
+                    n_isolated_apps = n_isolated_apps + 1;
+                    LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+                    if (n_isolated_apps == 1)
+                        mask_isolated = 0x00003;
+                    else if(mask_isolated != 0xfffff)
+                        mask_isolated = (mask_isolated << 2) | mask_isolated;
 
-					LinuxBase::get_cat()->add_task(3,taskPID);
-					LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(taskID,l3_occup_mb,CLOS_isolated));
-					LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
-					LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+                    LinuxBase::get_cat()->add_task(3,taskPID);
+                    LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(taskID,l3_occup_mb,CLOS_isolated));
+                    LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+                    LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 
-					// Update taskIsInCRCLOS
-					itT = taskIsInCRCLOS.erase(itT);
-					taskIsInCRCLOS.push_back(std::make_pair(taskID,CLOS_isolated));
-					id_isolated.push_back(taskID);
+                    // Update taskIsInCRCLOS
+                    itT = taskIsInCRCLOS.erase(itT);
+                    taskIsInCRCLOS.push_back(std::make_pair(taskID,CLOS_isolated));
+                    id_isolated.push_back(taskID);
 				}
 			}
-			/************************/
+			}
+			/*******************************************/
+
+			/***********PHASE DETECTION*****************/
+			// Detect phase changes only in apps which are critical
+			/*if ( CLOSvalue == 2)
+			{
+				if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
+        		{
+					// Calculate ICOV
+                	double my_sum = sumXij[taskID] / phase_duration[taskID];
+                	double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
+					double my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
+					LOGINF("{}: my_icov = {}"_format(taskID,my_ICOV));
+
+					// New phase detection
+					if (my_ICOV >= 0.5)
+					{
+						LOGINF("{}: NEW PHASE {} COMMING. Prev phase duration: {}"_format(taskID, phase_count[taskID], phase_duration[taskID]));
+						sumXij[taskID] = 0;
+
+						//if (phase_duration[taskID] <= 10)
+						//	windowSizeM[taskID] = phase_duration[taskID];
+						//else
+						//	windowSizeM[taskID] = 10;
+
+						//LOGINF("{}: windowSize changed to {}"_format(taskID,windowSizeM[taskID]));
+
+
+						phase_count[taskID] += 1;
+                    	phase_duration[taskID] = 0;
+
+						// Clear values of previous phase
+                  		deque_valid.clear();
+                  		LOGINF("{}: deque_valid has been cleared as a new phase is starting."_format(taskID));
+					}
+				}
+			}*/
+			/*******************************************/
 
 			// Add to valid_mpkil3 queue
             deque_valid.push_front(MPKIL3);
@@ -969,7 +997,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			phase_duration[taskID] = 0;
 			sumXij[taskID] = MPKIL3;
 			excluded[taskID]= false;
-			phase_change[taskID] = false;
         }
 	}
 
@@ -1064,52 +1091,40 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		auto itH = std::find_if(v_hpkil3.begin(), v_hpkil3.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
         double HPKIL3Task = std::get<1>(*itH);
 
-		// Check if application is critical
-		auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
-		double CLOSTask = std::get<1>(*itT);
-
-		if((CLOSTask == 2) & (phase_change[idTask] == false))
+        if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= 1))
+        {
+            LOGINF("The MPKI_L3 of task with id {} is an outlier, since {} >= {}"_format(idTask,MPKIL3Task,limit_outlier));
+            outlier.push_back(std::make_pair(idTask,1));
+            critical_apps = critical_apps + 1;
+			frequencyCritical[idTask]++;
+			if (excluded[idTask] == true)
+				excluded[idTask] = false;
+		}
+        else if((MPKIL3Task < limit_outlier) & (fractionCritical >= 0.5))
 		{
-			LOGINF("The task {} is critical and has not changed phase --> CRITICAL"_format(idTask));
+			LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
+			LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
+			outlier.push_back(std::make_pair(idTask,1));
+            critical_apps = critical_apps + 1;
 		}
 		else
-		{
-			phase_change[idTask] = false;
-			if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= 1))
+        {
+			// it's not a critical app
+			if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < 1))
 			{
-				LOGINF("The MPKI_L3 of task with id {} is an outlier, since {} >= {}"_format(idTask,MPKIL3Task,limit_outlier));
-				outlier.push_back(std::make_pair(idTask,1));
-				critical_apps = critical_apps + 1;
-				frequencyCritical[idTask]++;
-				if (excluded[idTask] == true)
-					excluded[idTask] = false;
+				LOGINF("The HPKIL3 of task {} is too low ({}) to be considered critical"_format(idTask,HPKIL3Task));
+				if ((excluded[idTask] == false) & (itX != id_isolated.end()))
+					excluded[idTask] = true;
 			}
-			else if((MPKIL3Task < limit_outlier) & (fractionCritical >= 0.5))
-			{
-				LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
-				LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
-				outlier.push_back(std::make_pair(idTask,1));
-				critical_apps = critical_apps + 1;
-			}
+			else if (itX != id_isolated.end())
+				LOGINF("Isolated app {} cannot be considered as critical!"_format(idTask));
 			else
-			{
-				// it's not a critical app
-				if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < 1))
-				{
-					LOGINF("The HPKIL3 of task {} is too low ({}) to be considered critical"_format(idTask,HPKIL3Task));
-					if ((excluded[idTask] == false) & (itX != id_isolated.end()))
-						excluded[idTask] = true;
-				}
-				else if (itX != id_isolated.end())
-					LOGINF("Isolated app {} cannot be considered as critical!"_format(idTask));
-				else
-					LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
-				outlier.push_back(std::make_pair(idTask,0));
-				// initialize counter if it's the first interval
-				if(current_interval == firstInterval)
-					frequencyCritical[idTask] = 0;
-			}
-		}
+				LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
+            outlier.push_back(std::make_pair(idTask,0));
+			// initialize counter if it's the first interval
+			if(current_interval == firstInterval)
+				frequencyCritical[idTask] = 0;
+        }
     }
 
 	LOGINF("critical_apps = {}"_format(critical_apps));
@@ -1159,12 +1174,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
         LinuxBase::get_cat()->set_cbm(2,maskCrCLOS);
         LOGINF("CLOS 2 (CR) now has mask {:#x}"_format(maskCrCLOS));
         LOGINF("CLOS 1 (non-CR) now has mask {:#x}"_format(maskNonCrCLOS));
-        //firstTime = 0;
-		if (state != 4)
-		{
-			idle = true;
-			firstTime = 0;
-		}
+        firstTime = 0;
+		idle = true;
 
 		//assign each core to its corresponding CLOS
         for (const auto &item : outlier)
@@ -1176,26 +1187,21 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			auto it = std::find_if(v_ipc.begin(), v_ipc.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
 			double ipcTask = std::get<1>(*it);
 
-			// Check if application is critical
-			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
-			double CLOSTask = std::get<1>(*itT);
-
-            if (outlierValue)
+            if(outlierValue)
             {
                 LinuxBase::get_cat()->add_task(2,pidTask);
 				LOGINF("Task ID {} assigned to CLOS 2"_format(idTask));
+				auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
         		itT = taskIsInCRCLOS.erase(itT);
                 taskIsInCRCLOS.push_back(std::make_pair(idTask,2));
                 ipc_CR += ipcTask;
             }
-            else if (CLOSTask != 3)
+            else
             {
-				//LinuxBase::get_cat()->add_task(1,pidTask);
-				LOGINF("Task ID {} assigned to CLOS {}"_format(idTask, CLOSTask));
+				LinuxBase::get_cat()->add_task(1,pidTask);
+				LOGINF("Task ID {} assigned to CLOS 1"_format(idTask));
                 ipc_NCR += ipcTask;
             }
-			else if (CLOSTask == 3)
-				LOGINF("Task ID {} is isolated in CLOS {}"_format(idTask, CLOSTask));
         }
 	}
 	else
