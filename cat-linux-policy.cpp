@@ -691,7 +691,7 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 	idle = false;
 	idle_count = IDLE_INTERVALS;
 
-	LOGINF("[UPDATE] From {} to {} critical apps."_format(num_critical_old,num_critical_new));
+	LOGINF("[UPDATE] From {} ways to {} ways"_format(num_critical_old,num_critical_new));
 
 	// If 4 or 0 new critical apps are detected...
 	// >> assign CLOSes mask 0xfffff
@@ -1175,7 +1175,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
         LOGINF("CLOS 2 (CR) now has mask {:#x}"_format(maskCrCLOS));
         LOGINF("CLOS 1 (non-CR) now has mask {:#x}"_format(maskNonCrCLOS));
         firstTime = 0;
-		idle = true;
 
 		//assign each core to its corresponding CLOS
         for (const auto &item : outlier)
