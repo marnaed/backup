@@ -877,15 +877,31 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
             uint64_t CLOSvalue = std::get<1>(*itT);
 
+			sumXij[taskID] += MPKIL3;
+			phase_duration[taskID] += 1;
+
+			// Calculate ICOV
+			if (phase_duration[taskID] > 1)
+			{
+				double my_sum = sumXij[taskID] / phase_duration[taskID];
+				double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
+				my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
+				LOGINF("{}: my_icov = {} (dur: {})"_format(taskID,my_ICOV,phase_duration[taskID]));
+				if (my_ICOV >= 0.5)
+				{
+					phase_count[taskID] += 1;
+					phase_duration[taskID] = 1;
+					sumXij[taskID] = MPKIL3;
+					icov[taskID] = true;
+				}
+			 }
+
 			if (current_interval >= firstInterval)
 			{
-				sumXij[taskID] += MPKIL3;
+				/*sumXij[taskID] += MPKIL3;
               	phase_duration[taskID] += 1;
-				//auto itX = std::find (id_isolated.begin(), id_isolated.end(), taskID);
-				//if ((itX != id_isolated.end()) & (HPKIL3 > 1))
 
 				// Calculate ICOV
-				//if ( ((phase_count[taskID] == 1) & (phase_duration[taskID] >= windowSizeM[taskID])) | ((phase_count[taskID] > 1)  & (phase_duration[taskID] > 1)) )
 				if (phase_duration[taskID] > 1)
 				{
 					double my_sum = sumXij[taskID] / phase_duration[taskID];
@@ -899,7 +915,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
                     	sumXij[taskID] = MPKIL3;
 						icov[taskID] = true;
 					}
-                 }
+                 }*/
 
 				/***********ISOLATION MECHANISM*************/
 				// Check if there is a non-critical application occupying more space than it should
@@ -985,7 +1001,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 			windowSizeM[taskID] = windowSize;
 			phase_count[taskID] = 1;
-			phase_duration[taskID] = 0;
+			phase_duration[taskID] = 1;
 			sumXij[taskID] = MPKIL3;
 			phase_change[taskID] = false;
 			excluded[taskID]= false;
