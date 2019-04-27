@@ -898,25 +898,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 			if (current_interval >= firstInterval)
 			{
-				/*sumXij[taskID] += MPKIL3;
-              	phase_duration[taskID] += 1;
-
-				// Calculate ICOV
-				if (phase_duration[taskID] > 1)
-				{
-					double my_sum = sumXij[taskID] / phase_duration[taskID];
-					double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
-            		my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
-            		LOGINF("{}: my_icov = {} (dur: {})"_format(taskID,my_ICOV,phase_duration[taskID]));
-					if (my_ICOV >= 0.5)
-                	{
-                		phase_count[taskID] += 1;
-                    	phase_duration[taskID] = 1;
-                    	sumXij[taskID] = MPKIL3;
-						icov[taskID] = true;
-					}
-                 }*/
-
 				/***********ISOLATION MECHANISM*************/
 				// Check if there is a non-critical application occupying more space than it should
 				// // or if an isolated app must be returned to CLOS 1
@@ -941,8 +922,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
 						LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 						id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
-
-						excluded[taskID] = false;
 					}
 				}
 				else if (CLOSvalue == 1)
@@ -983,8 +962,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						phase_change[taskID] = true;
 					}
 				}
-
-				icov[taskID] = false;
 			}
 
 			// Add to valid_mpkil3 queue
@@ -992,6 +969,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 			// Store queue modified in the dictionary
 			valid_mpkil3[taskID] = deque_valid;
+
+			icov[taskID] = false;
 		}
         else
         {
@@ -1128,13 +1107,19 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < 1))
 			{
 				LOGINF("The HPKIL3 of task {} is too low ({}) to be considered critical"_format(idTask,HPKIL3Task));
-				if ((excluded[idTask] == false) & (itX != id_isolated.end()))
+				if (excluded[idTask] == false)
 					excluded[idTask] = true;
 			}
-			else if (itX != id_isolated.end())
-				LOGINF("Isolated app {} cannot be considered as critical!"_format(idTask));
 			else
-				LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
+			{
+				if (itX != id_isolated.end())
+					LOGINF("Isolated app {} cannot be considered as critical!"_format(idTask));
+				else
+					LOGINF("The MPKI_L3 of task with id {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
+
+				if (excluded[idTask] == true)
+					excluded[idTask] = false;
+			}
             outlier.push_back(std::make_pair(idTask,0));
 			// initialize counter if it's the first interval
 			if(current_interval == firstInterval)
