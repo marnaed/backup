@@ -184,6 +184,7 @@ class CriticalAwareV3: public LinuxBase
 	// set of MPKIL3 values
 	std::map<uint64_t, bool> excluded;
 	std::map<uint64_t, bool> phase_change;
+	std::map<uint64_t, bool> icov;
 
     uint64_t idle_count = IDLE_INTERVALS;
     bool idle = false;
