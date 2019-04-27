@@ -886,7 +886,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				double my_sum = sumXij[taskID] / phase_duration[taskID];
 				double prev_sum = (sumXij[taskID] - MPKIL3) / (phase_duration[taskID] - 1);
 				my_ICOV = fabs(MPKIL3 - prev_sum) / my_sum;
-				LOGINF("{}: my_icov = {} (dur: {})"_format(taskID,my_ICOV,phase_duration[taskID]));
+				LOGINF("{}: my_icov = {}"_format(taskID,my_ICOV));
 				if (my_ICOV >= 0.5)
 				{
 					phase_count[taskID] += 1;
@@ -903,8 +903,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				// // or if an isolated app must be returned to CLOS 1
 				if ((CLOSvalue == 3) & (HPKIL3 > 1))
 				{
-					if (icov[taskID] == true)
-					{
+					//if (icov[taskID] == true)
+					//{
 						// New phase detection
 						// If app. is not critical and isolated
 						// return it to CLOS 1 if it is higher than threshold
@@ -922,7 +922,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
 						LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 						id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
-					}
+					//}
 				}
 				else if (CLOSvalue == 1)
 				{
