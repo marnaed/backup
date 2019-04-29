@@ -893,6 +893,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					phase_duration[taskID] = 1;
 					sumXij[taskID] = MPKIL3;
 					icov[taskID] = true;
+					excluded[taskID] = false;
 				}
 			 }
 
@@ -903,9 +904,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				// // or if an isolated app must be returned to CLOS 1
 				if ((CLOSvalue == 3) & (HPKIL3 > 1))
 				{
-					//if (icov[taskID] == true)
-					//{
-						// New phase detection
 						// If app. is not critical and isolated
 						// return it to CLOS 1 if it is higher than threshold
 						LinuxBase::get_cat()->add_task(1,taskPID);
@@ -922,7 +920,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
 						LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 						id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
-					//}
 				}
 				else if (CLOSvalue == 1)
 				{
@@ -1083,7 +1080,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 		if ((CLOSvalue == 2) & (phase_change[idTask] == false))
 		{
-			LOGINF("The critical task {} has not changed phase --> CRITICAL");
+			LOGINF("The critical task {} has not changed phase --> CRITICAL"_format(idTask));
+			outlier.push_back(std::make_pair(idTask,1));
+            critical_apps = critical_apps + 1;
+            frequencyCritical[idTask]++;
 		}
         else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= 1))
         {
@@ -1106,9 +1106,14 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			// it's not a critical app
 			if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < 1))
 			{
-				LOGINF("The HPKIL3 of task {} is too low ({}) to be considered critical"_format(idTask,HPKIL3Task));
-				if (excluded[idTask] == false)
-					excluded[idTask] = true;
+				if (itX != id_isolated.end())
+				{
+					LOGINF("The HPKIL3 of task {} is too low ({}) and it's isolated --> EXCLUDED"_format(idTask,HPKIL3Task));
+					if (excluded[idTask] == false)
+						excluded[idTask] = true;
+				}
+				else
+					LOGINF("The HPKIL3 of task {} is too low ({}) to be considered critical"_format(idTask,HPKIL3Task));
 			}
 			else
 			{
