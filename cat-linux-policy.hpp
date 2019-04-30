@@ -171,11 +171,14 @@ class CriticalAwareV3: public LinuxBase
     std::map<uint32_t, std::deque<double>> valid_mpkil3;
 
     // dictionaries holdind phase info for each task
-    std::map<uint32_t, uint64_t> phase_count;
-    std::map<uint32_t, uint64_t> phase_duration;
+    std::map<uint32_t, uint64_t> mpkil3_phase_count;
+    std::map<uint32_t, uint64_t> mpkil3_phase_duration;
+	std::map<uint32_t, uint64_t> ipc_phase_count;
+    std::map<uint32_t, uint64_t> ipc_phase_duration;
 
     // dictionary holding sum of MPKIL3 of each application during a given phase
-    std::map<uint32_t, double> sumXij;
+    std::map<uint32_t, double> mpkil3_sumXij;
+	std::map<uint32_t, double> ipc_sumXij;
 	// Map of windowSizes
     std::map<uint64_t, double> windowSizeM;
 
@@ -183,8 +186,8 @@ class CriticalAwareV3: public LinuxBase
 	// In order for next interval to not contaminate
 	// set of MPKIL3 values
 	std::map<uint64_t, bool> excluded;
-	std::map<uint64_t, bool> phase_change;
-	std::map<uint64_t, bool> icov;
+	std::map<uint64_t, bool> mpkil3_phase_change;
+	std::map<uint64_t, bool> mpkil3_icov;
 
     uint64_t idle_count = IDLE_INTERVALS;
     bool idle = false;
