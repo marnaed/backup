@@ -186,8 +186,9 @@ class CriticalAwareV3: public LinuxBase
 	// In order for next interval to not contaminate
 	// set of MPKIL3 values
 	std::map<uint64_t, bool> excluded;
-	std::map<uint64_t, bool> mpkil3_phase_change;
-	std::map<uint64_t, bool> mpkil3_icov;
+	std::map<uint64_t, bool> ipc_phase_change;
+	std::map<uint64_t, bool> ipc_icov;
+	std::map<uint64_t, bool> first_time_critical;
 
     uint64_t idle_count = IDLE_INTERVALS;
     bool idle = false;
@@ -201,6 +202,8 @@ class CriticalAwareV3: public LinuxBase
         >
     >
     ca_accum_t;
+
+	std::map<uint64_t, double> prev_ipc;
 
     //vector to store if task is assigned to critical CLOS
 	typedef std::tuple<uint32_t, uint64_t> pair_t;
