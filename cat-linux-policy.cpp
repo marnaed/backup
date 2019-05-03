@@ -972,28 +972,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					/***********PHASE DETECTION*****************/
 					// Detect phase changes only in apps which are critical
-
-					// New IPC phase is better than previous one
-					// keep this app as critical
-					/*if ((ipc_icov[taskID] == true) & (ipc_mean_prev_phase[taskID] <= ipc))
-					{
-						// New phase detection
-						LOGINF("{}: NEW POSITIVE IPC PHASE {} COMMING"_format(taskID, ipc_phase_count[taskID], ipc_phase_duration[taskID]));
-						LOGINF("{}: maintain as critical app"_format(taskID));
-						ipc_phase_change[taskID] = false;
-					}
-					else if ((ipc_icov[taskID] == false) & (idle == false) & (ipc_phase_change[taskID] == true))
-					{
-						LOGINF("{}: No phase change experienced with more cache ways --> no more CRITICAL"_format(taskID));
-						ipc_phase_change[taskID] = true;
-					}*/
-					/*if ((ipc_icov[taskID] == true) & (ipc_mean_prev_phase[taskID] > ipc))
-					{
-						LOGINF("{}: NEW NEGATIVE IPC PHASE {} COMMING"_format(taskID, ipc_phase_count[taskID], ipc_phase_duration[taskID]));
-						ipc_phase_change[taskID] = true;
-					}*/
-
-					if ((ipc_icov[taskID] == false) & (ipc < 0.96*prev_ipc[taskID]))
+					//if ((ipc_icov[taskID] == false) & (ipc < 0.96*prev_ipc[taskID]))
+					if ((ipc_icov[taskID] == false) & (ipc_icov[taskID] == true) & (ipc < 0.96*prev_ipc[taskID]))
 					{
 						LOGINF("{}: ipc now {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
 						ipc_phase_change[taskID] = true;
