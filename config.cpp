@@ -88,7 +88,7 @@ std::shared_ptr<cat::policy::Base> config_read_cat_policy(const YAML::Node &conf
 		LOGINF("Using Critical-Aware (cav3) CAT policy");
 
 		// Check that required fields exist
-		for (string field : {"every", "firstInterval", "IDLE_INTERVALS"})
+		for (string field : {"every", "firstInterval", "IDLE_INTERVALS", "ipc_threshold"})
 		{
 			if (!policy[field])
 				throw_with_trace(std::runtime_error("The '" + kind + "' CAT policy needs the '" + field + "' field"));
@@ -97,8 +97,9 @@ std::shared_ptr<cat::policy::Base> config_read_cat_policy(const YAML::Node &conf
 		uint64_t every = policy["every"].as<uint64_t>();
 		uint64_t firstInterval = policy["firstInterval"].as<uint64_t>();
 		uint64_t IDLE_INTERVALS = policy["IDLE_INTERVALS"].as<uint64_t>();
+		double ipc_threshold = policy["ipc_threshold"].as<double>();
 
-		return std::make_shared<cat::policy::CriticalAwareV3>(every, firstInterval, IDLE_INTERVALS);
+		return std::make_shared<cat::policy::CriticalAwareV3>(every, firstInterval, IDLE_INTERVALS, ipc_threshold);
 	}
 	else if (kind == "cav2")
     {

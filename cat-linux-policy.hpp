@@ -139,6 +139,7 @@ class CriticalAwareV3: public LinuxBase
     uint64_t every = -1;
     uint64_t firstInterval = 1;
 	uint64_t IDLE_INTERVALS = 1;
+	double ipc_threshold = 0;
 
     //Masks of CLOS
     uint64_t maskCrCLOS = 0xfffff;
@@ -220,7 +221,7 @@ class CriticalAwareV3: public LinuxBase
 
 	//typedef std::tuple<pid_t, uint64_t> pair_t
 
-    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _IDLE_INTERVALS) : every(_every), firstInterval(_firstInterval),IDLE_INTERVALS(_IDLE_INTERVALS) {}
+    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _IDLE_INTERVALS, double _ipc_threshold) : every(_every), firstInterval(_firstInterval),IDLE_INTERVALS(_IDLE_INTERVALS), ipc_threshold(_ipc_threshold) {}
 
     virtual ~CriticalAwareV3() = default;
 

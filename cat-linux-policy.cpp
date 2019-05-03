@@ -907,7 +907,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			prev_sum = (ipc_sumXij[taskID] - ipc) / (ipc_phase_duration[taskID] - 1);
 			ipc_ICOV = fabs(ipc - prev_sum) / my_sum;
 			LOGINF("{}: ipc_icov = {} ({})"_format(taskID,ipc_ICOV,ipc));
-			if (ipc_ICOV >= 0.25)
+			if (ipc_ICOV >= ipc_threshold)
 			{
 				LOGINF("{} IPC PHASE CHANGE {}"_format(taskID,ipc_phase_count[taskID]));
 				ipc_phase_count[taskID] += 1;
