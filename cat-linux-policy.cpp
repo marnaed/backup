@@ -972,27 +972,16 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					/***********PHASE DETECTION*****************/
 					// Detect phase changes only in apps which are critical
-					//if ((ipc_icov[taskID] == false) & (ipc_icov[taskID] == true) & (ipc < 0.96*prev_ipc[taskID]))
-					/*if ((ipc_icov[taskID] == false) & (ipc < 0.96*prev_ipc[taskID]))
-					{
-						count_down[taskID] = count_down[taskID] + 1;
-						LOGINF("{}: count_down = {}"_format(taskID, count_down[taskID]));
-						if (count_down[taskID] == 2)
-						{
-							LOGINF("{}: ipc now {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
-							ipc_phase_change[taskID] = true;
-							count_down[taskID] = 0;
-						}
-					}
-					else */
 					if ((ipc_icov[taskID] == true) & (ipc < 0.96*prev_ipc[taskID]))
 					{
 						LOGINF("{}: ipc in new phase {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
 						ipc_phase_change[taskID] = true;
-						//count_down[taskID] = 0;
 					}
-					//else
-					//	count_down[taskID] = 0;
+					else if ((ipc_icov[taskID] == false) & (ipc_ICOV >= 0.05) & (ipc < 0.96*prev_ipc[taskID]))
+					{
+						LOGINF("{}: ipc {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
+						ipc_phase_change[taskID] = true;
+					}
 
 				}
 			}
@@ -1022,8 +1011,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			excluded[taskID]= false;
 			ipc_icov[taskID] = false;
 			first_time_critical[taskID]= true;
-			prev_ipc[taskID] = ipc;
-			//count_down[taskID]= 0;
         }
 
 		prev_ipc[taskID] = ipc;
