@@ -972,15 +972,41 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					/***********PHASE DETECTION*****************/
 					// Detect phase changes only in apps which are critical
-					if ((ipc_icov[taskID] == true) & (ipc < 0.96*prev_ipc[taskID]))
+					// IF app has changed phase and new phase is lower ---> check again if it is still critical
+					if (ipc_icov[taskID] == true)
 					{
-						LOGINF("{}: ipc in new phase {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
-						ipc_phase_change[taskID] = true;
+						ipc_good[taskID] = true;
+						/*if (ipc < 0.96*prev_ipc[taskID])
+						{
+							LOGINF("{}: ipc in new phase {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
+							ipc_phase_change[taskID] = true;
+						}
+						else
+						{
+							LOGINF("{}: ipc in new phase {} is better than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
+							ipc_phase_change[taskID] = false;
+							ipc_good[taskID] = true;
+						}*/
 					}
-					else if ((ipc_icov[taskID] == false) & (ipc_ICOV >= 0.05) & (ipc < 0.96*prev_ipc[taskID]))
+					else
+					{
+            		/*else if ((ipc_icov[taskID] == false) & (ipc_ICOV >= 0.05) & (ipc < 0.96*prev_ipc[taskID]))
 					{
 						LOGINF("{}: ipc {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
 						ipc_phase_change[taskID] = true;
+					} */
+						//if ((ipc_ICOV >= 0.05) & (ipc >= 0.96*prev_ipc[taskID]))
+						if (ipc >= 0.96*prev_ipc[taskID])
+						{
+							LOGINF("{}: ipc doing good! "_format(taskID));
+							ipc_phase_change[taskID] = false;
+							ipc_good[taskID] = true;
+						}
+						else if ((idle == false) & (ipc_good[taskID] == false) & (ipc < 0.96*prev_ipc[taskID]))
+						{
+							LOGINF("{}: ipc {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
+							ipc_phase_change[taskID] = true;
+						}
 					}
 
 				}
@@ -1011,6 +1037,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			excluded[taskID]= false;
 			ipc_icov[taskID] = false;
 			first_time_critical[taskID]= true;
+			ipc_good[taskID] = false;
         }
 
 		prev_ipc[taskID] = ipc;
@@ -1111,7 +1138,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 		if (CLOSvalue == 2)
 		{
-			if (ipc_phase_change[idTask] == false)
+			if ((ipc_phase_change[idTask] == false) & (ipc_good[idTask] == true))
 			{
 				LOGINF("The critical task {} has not changed phase --> CRITICAL"_format(idTask));
 				outlier.push_back(std::make_pair(idTask,1));
@@ -1124,6 +1151,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				outlier.push_back(std::make_pair(idTask,0));
 				ipc_phase_change[idTask] = false;
 			}
+			ipc_good[idTask] = false;
 		}
         else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= 1))
         {
