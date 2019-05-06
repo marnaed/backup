@@ -190,6 +190,7 @@ class CriticalAwareV3: public LinuxBase
 	std::map<uint64_t, bool> ipc_phase_change;
 	std::map<uint64_t, bool> ipc_icov;
 	std::map<uint64_t, bool> first_time_critical;
+	std::map<uint64_t, bool> ipc_good;
 
     uint64_t idle_count = IDLE_INTERVALS;
     bool idle = false;
