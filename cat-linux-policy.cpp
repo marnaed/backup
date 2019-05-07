@@ -1040,7 +1040,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			ipc_good[taskID] = false;
         }
 
-		prev_ipc[taskID] = ipc;
+		//prev_ipc[taskID] = ipc;
 	}
 
 	LOGINF("Total L3 occupation: {}"_format(l3_occup_mb_total));
@@ -1160,8 +1160,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		}
         else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= 1))
         {
-        	if ((first_time_critical[idTask] == true) | ((first_time_critical[idTask] == false) & (HPKIL3Task >= MPKIL3Task)))
-			{
+        	//if ((first_time_critical[idTask] == true) | ((first_time_critical[idTask] == false) & (HPKIL3Task >= 0.5*MPKIL3Task)))
+			//{
 				LOGINF("The MPKI_L3 of task {} is an outlier, since {} >= {}"_format(idTask,MPKIL3Task,limit_outlier));
 				outlier.push_back(std::make_pair(idTask,1));
 				critical_apps = critical_apps + 1;
@@ -1170,12 +1170,12 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					excluded[idTask] = false;
 				first_time_critical[idTask] = false;
 				prev_ipc[idTask] = IPCTask;
-			}
-			else if((first_time_critical[idTask] == false) & (HPKIL3Task < MPKIL3Task))
-			{
-				LOGINF("The HPKIL3 of task {} is too low ({} < {}) to be considered critical"_format(idTask,HPKIL3Task,MPKIL3Task));
-				outlier.push_back(std::make_pair(idTask,0));
-			}
+			//}
+			//else if((first_time_critical[idTask] == false) & (HPKIL3Task < MPKIL3Task))
+			//{
+				//LOGINF("The HPKIL3 of task {} is too low ({} < {}) to be considered critical"_format(idTask,HPKIL3Task,MPKIL3Task));
+				//outlier.push_back(std::make_pair(idTask,0));
+			//}
 
 		}
         else if((MPKIL3Task < limit_outlier) & (fractionCritical >= 0.5))
