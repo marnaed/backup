@@ -947,7 +947,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					double limit_space = num_ways_CLOS_1 / 3;
 					LOGINF("limit_space {} ({})"_format(limit_space,num_ways_CLOS_1));
 					// Check if there is a non-critical application occupying more space than it should
-					if ((l3_occup_mb > limit_space) & (HPKIL3 < 1))
+					if ((l3_occup_mb > limit_space) & (HPKIL3 < 1) & (n_isolated_apps < 3))
 					{
 						// Isolate it in a separate CLOS with two exclusive ways
 						n_isolated_apps = n_isolated_apps + 1;
@@ -996,13 +996,13 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						ipc_phase_change[taskID] = true;
 					} */
 						//if ((ipc_ICOV >= 0.05) & (ipc >= 0.96*prev_ipc[taskID]))
-						if (ipc >= 0.96*prev_ipc[taskID])
+						if ((idle == false) & (ipc >= 0.96*prev_ipc[taskID]))
 						{
 							LOGINF("{}: ipc doing good! "_format(taskID));
 							ipc_phase_change[taskID] = false;
 							ipc_good[taskID] = true;
 						}
-						else if ((idle == false) & (ipc_good[taskID] == false) & (ipc < 0.96*prev_ipc[taskID]))
+						else if ((idle == false) & (ipc < 0.96*prev_ipc[taskID]))
 						{
 							LOGINF("{}: ipc {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
 							ipc_phase_change[taskID] = true;
@@ -1132,6 +1132,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		auto itH = std::find_if(v_hpkil3.begin(), v_hpkil3.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
         double HPKIL3Task = std::get<1>(*itH);
 
+		// Find IPC
+		auto itI = std::find_if(v_ipc.begin(), v_ipc.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
+        double IPCTask = std::get<1>(*itI);
+
 		// Find CLOS value
 		auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
         uint64_t CLOSvalue = std::get<1>(*itT);
@@ -1152,6 +1156,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				ipc_phase_change[idTask] = false;
 			}
 			ipc_good[idTask] = false;
+			prev_ipc[idTask] = IPCTask;
 		}
         else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= 1))
         {
@@ -1164,6 +1169,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				if (excluded[idTask] == true)
 					excluded[idTask] = false;
 				first_time_critical[idTask] = false;
+				prev_ipc[idTask] = IPCTask;
 			}
 			else if((first_time_critical[idTask] == false) & (HPKIL3Task < MPKIL3Task))
 			{
@@ -1178,6 +1184,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
 			outlier.push_back(std::make_pair(idTask,1));
             critical_apps = critical_apps + 1;
+			prev_ipc[idTask] = IPCTask;
 		}
 		else
         {
