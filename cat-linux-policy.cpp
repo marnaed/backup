@@ -930,10 +930,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 					excluded[taskID] = false;
 
-					LOGINF("[TEST] {}: New phase detected --> return to CLOS 1"_format(taskID));
+					LOGINF("[TEST] {}: HPKIL3 is higher than threshold --> return to CLOS 1"_format(taskID));
 					n_isolated_apps = n_isolated_apps - 1;
-					//if (CLOS_isolated > 3)
-					//	CLOS_isolated = CLOS_isolated - 1;
 					LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
 
 					free_closes.push_back(CLOSvalue);
@@ -974,7 +972,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					// IF app has changed phase and new phase is lower ---> check again if it is still critical
 					if ((ipc_icov[taskID] == true) & (ipc_ICOV >= ipc_threshold))
 					{
-						//ipc_good[taskID] = true;
 						if (ipc < 0.96*prev_ipc[taskID])
 						{
 							LOGINF("{}: ipc in new phase {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
@@ -989,7 +986,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					}
 					else if((ipc_icov[taskID] == false) & (idle == false))
 					{
-						//if ((ipc_ICOV >= 0.05) & (ipc >= 0.96*prev_ipc[taskID]))
 						if (ipc >= 0.96*prev_ipc[taskID])
 						{
 							LOGINF("{}: ipc doing good! "_format(taskID));
@@ -1149,7 +1145,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			ipc_good[idTask] = false;
 			prev_ipc[idTask] = IPCTask;
 		}
-        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= 0.5*MPKIL3Task))
+        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= fraction_mpkil3*MPKIL3Task))
         {
 			LOGINF("The MPKI_L3 of task {} is an outlier, since {} >= {}"_format(idTask,MPKIL3Task,limit_outlier));
 			outlier.push_back(std::make_pair(idTask,1));
@@ -1171,7 +1167,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		else
         {
 			// it's not a critical app
-			if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < 0.5*MPKIL3Task))
+			if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < fraction_mpkil3*MPKIL3Task))
 			{
 				if (itX != id_isolated.end())
 				{
@@ -1180,7 +1176,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						excluded[idTask] = true;
 				}
 				else
-					LOGINF("The HPKIL3 of task {} is too low ({} < 0.5*{}) to be considered critical"_format(idTask,HPKIL3Task,MPKIL3Task));
+					LOGINF("The HPKIL3 of task {} is too low ({} < {}*{}) to be considered critical"_format(idTask,HPKIL3Task,fraction_mpkil3,MPKIL3Task));
 			}
 			else
 			{

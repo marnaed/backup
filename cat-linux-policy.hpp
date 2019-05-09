@@ -140,6 +140,7 @@ class CriticalAwareV3: public LinuxBase
     uint64_t firstInterval = 1;
 	uint64_t IDLE_INTERVALS = 1;
 	double ipc_threshold = 0;
+	double fraction_mpkil3 = 1;
 
     //Masks of CLOS
     uint64_t maskCrCLOS = 0xfffff;
@@ -167,15 +168,12 @@ class CriticalAwareV3: public LinuxBase
 	uint64_t CLOS_isolated = 3;
     uint64_t n_isolated_apps = 0;
     uint64_t mask_isolated = 0x00003;
-
+	std::vector<uint64_t> free_closes = {3, 4, 5};
 	std::map<uint64_t, uint64_t> clos_mask = {
           { 3, 0x00003 },
           { 4, 0x0000f },
           { 5, 0x00030 }
 	};
-
-	std::vector<uint64_t> free_closes = {3, 4, 5};
-
 
 	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
     std::map<uint32_t, std::deque<double>> valid_mpkil3;
@@ -230,7 +228,7 @@ class CriticalAwareV3: public LinuxBase
 
 	//typedef std::tuple<pid_t, uint64_t> pair_t
 
-    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _IDLE_INTERVALS, double _ipc_threshold) : every(_every), firstInterval(_firstInterval),IDLE_INTERVALS(_IDLE_INTERVALS), ipc_threshold(_ipc_threshold) {}
+    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _IDLE_INTERVALS, double _ipc_threshold, double _fraction_mpkil3) : every(_every), firstInterval(_firstInterval),IDLE_INTERVALS(_IDLE_INTERVALS), ipc_threshold(_ipc_threshold), fraction_mpkil3(_fraction_mpkil3) {}
 
     virtual ~CriticalAwareV3() = default;
 
