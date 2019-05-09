@@ -168,6 +168,15 @@ class CriticalAwareV3: public LinuxBase
     uint64_t n_isolated_apps = 0;
     uint64_t mask_isolated = 0x00003;
 
+	std::map<uint64_t, uint64_t> clos_mask = {
+          { 3, 0x00003 },
+          { 4, 0x0000f },
+          { 5, 0x00030 }
+	};
+
+	std::vector<uint64_t> free_closes = {3, 4, 5};
+
+
 	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
     std::map<uint32_t, std::deque<double>> valid_mpkil3;
 
@@ -189,7 +198,6 @@ class CriticalAwareV3: public LinuxBase
 	std::map<uint64_t, bool> excluded;
 	std::map<uint64_t, bool> ipc_phase_change;
 	std::map<uint64_t, bool> ipc_icov;
-	std::map<uint64_t, bool> first_time_critical;
 	std::map<uint64_t, bool> ipc_good;
 
     uint64_t idle_count = IDLE_INTERVALS;
