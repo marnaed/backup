@@ -827,7 +827,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	uint32_t idTask;
 
 	// Accumulator to calculate mean and std of mpkil3
-	ca_accum_t macc;
+	ca_accum_t macc, hacc;
 
     // Number of critical apps found in the interval
     uint32_t critical_apps = 0;
@@ -870,13 +870,18 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 		// Update queue of each task with last value of MPKI-L3
 		auto it2 = valid_mpkil3.find(taskID);
-        if (it2 != valid_mpkil3.end())
+		auto it3 = valid_hpkil3.find(taskID);
+        if ((it2 != valid_mpkil3.end()) & (it3 != valid_hpkil3.end()))
 		{
-			std::deque<double> deque_valid = it2->second;
+			std::deque<double> deque_mpkil3 = it2->second;
+			std::deque<double> deque_hpkil3 = it3->second;
 
 			// Remove values until vector size is equal to sliding window size
-			while (deque_valid.size() >= windowSizeM[taskID])
-				deque_valid.pop_back();
+			while (deque_mpkil3.size() >= windowSizeM[taskID])
+				deque_mpkil3.pop_back();
+
+			while (deque_hpkil3.size() >= windowSizeM[taskID])
+				deque_hpkil3.pop_back();
 
 			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
             uint64_t CLOSvalue = std::get<1>(*itT);
@@ -1005,16 +1010,19 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			}
 
 			// Add to valid_mpkil3 queue
-            deque_valid.push_front(MPKIL3);
+            deque_mpkil3.push_front(MPKIL3);
+			deque_hpkil3.push_front(HPKIL3);
 
 			// Store queue modified in the dictionary
-			valid_mpkil3[taskID] = deque_valid;
+			valid_mpkil3[taskID] = deque_mpkil3;
+			valid_hpkil3[taskID] = deque_hpkil3;
 		}
         else
         {
 			// Add a new entry in the dictionary
 			LOGINF("NEW ENTRY IN DICT valid_mpkil3 added");
 			valid_mpkil3[taskID].push_front(MPKIL3);
+			valid_hpkil3[taskID].push_front(HPKIL3);
 			taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 			windowSizeM[taskID] = windowSize;
 			mpkil3_phase_count[taskID] = 1;
@@ -1067,6 +1075,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		return;
 	}
 
+	LOGINF("-MPKIL3-");
     // Add values of MPKI-L3 from each app to the common set
 	for (auto const &x : valid_mpkil3)
 	{
@@ -1089,11 +1098,47 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			LOGINF("Task {} is excluded!!!"_format(idTask));
 	}
 
+	LOGINF("--------");
+	LOGINF("-HPKIL3-");
+	for (auto const &x : valid_hpkil3)
+	{
+		// Get deque
+		std::deque<double> val = x.second;
+		idTask = x.first;
+		std::string res;
+
+		// Add values
+		if (excluded[idTask] == false)
+		{
+			for (auto i = val.cbegin(); i != val.cend(); ++i)
+			{
+				res = res + std::to_string(*i) + " ";
+				hacc(*i);
+				all_hpkil3.insert(*i);
+			}
+			LOGINF(res);
+		}
+		else
+			LOGINF("Task {} is excluded!!!"_format(idTask));
+	}
+	LOGINF("--------");
+
+
 	/** Calculate limit outlier using 3std **/
 	double mean = acc::mean(macc);
 	double var = acc::variance(macc);
 	double limit_outlier = mean + 1.5*std::sqrt(var);
-	LOGINF("1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
+	LOGINF("MPKIL3 1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
+
+	//mean = acc::mean(hacc);
+	//var = acc::variance(hacc);
+	uint64_t size = all_hpkil3.size();
+    //double q1 = *std::next(all_hpkil3.begin(), size/4);
+    //double q2 = *std::next(all_hpkil3.begin(), size/2);
+    double q3 = *std::next(all_hpkil3.begin(), size*0.75);
+	double limit_houtlier = q3;
+	LOGINF("HPKIL3 LIMIT OUTLIER = {}"_format(limit_houtlier));
+
 
 	//Check if MPKI-L3 of each APP is 2 stds o more higher than the mean MPKI-L3
     for (const auto &item : v_mpkil3)
@@ -1147,9 +1192,9 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			ipc_good[idTask] = false;
 			prev_ipc[idTask] = IPCTask;
 		}
-        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= fraction_mpkil3*MPKIL3Task))
+        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= limit_houtlier))
         {
-			LOGINF("The MPKI_L3 of task {} is an outlier, since {} >= {}"_format(idTask,MPKIL3Task,limit_outlier));
+			LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
 			outlier.push_back(std::make_pair(idTask,1));
 			critical_apps = critical_apps + 1;
 			frequencyCritical[idTask]++;
@@ -1169,7 +1214,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		else
         {
 			// it's not a critical app
-			if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < fraction_mpkil3*MPKIL3Task))
+			if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < limit_houtlier))
 			{
 				if (itX != id_isolated.end())
 				{
@@ -1178,14 +1223,17 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						excluded[idTask] = true;
 				}
 				else
-					LOGINF("The HPKIL3 of task {} is too low ({} < {}*{}) to be considered critical"_format(idTask,HPKIL3Task,fraction_mpkil3,MPKIL3Task));
+					LOGINF("The HPKIL3 of task {} is too low ({} < {}) to be considered critical"_format(idTask,HPKIL3Task,limit_houtlier));
+
 			}
 			else
 			{
 				if (itX != id_isolated.end())
 					LOGINF("Isolated task {} cannot be considered as critical!"_format(idTask));
+				else if (HPKIL3Task >= limit_houtlier)
+					LOGINF("The MPKI_L3 of task {} is NOT an outlier, since MPKIL3 {} < {} but  HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
 				else
-					LOGINF("The MPKI_L3 of task {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
+					LOGINF("The MPKI_L3 of task {} is NOT an outlier, since MPKIL3 {} < {} & HPKIL3 {} < {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
 
 				if (excluded[idTask] == true)
 					excluded[idTask] = false;

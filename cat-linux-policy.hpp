@@ -177,6 +177,8 @@ class CriticalAwareV3: public LinuxBase
 
 	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
     std::map<uint32_t, std::deque<double>> valid_mpkil3;
+	std::map<uint32_t, std::deque<double>> valid_hpkil3;
+	std::set<double> all_hpkil3;
 
     // dictionaries holdind phase info for each task
     std::map<uint32_t, uint64_t> mpkil3_phase_count;
