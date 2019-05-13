@@ -972,9 +972,9 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					// IF app has changed phase and new phase is lower ---> check again if it is still critical
 					if ((ipc_icov[taskID] == true) & (ipc_ICOV >= ipc_threshold))
 					{
-						ipc_good[taskID] = true;
+						//ipc_good[taskID] = true;
 
-						/*if (ipc < 0.96*prev_ipc[taskID])
+						if (ipc < 0.96*prev_ipc[taskID])
 						{
 							LOGINF("{}: ipc in new phase {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
 							ipc_phase_change[taskID] = true;
@@ -984,7 +984,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 							LOGINF("{}: ipc in new phase {} is better than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
 							ipc_phase_change[taskID] = false;
 							ipc_good[taskID] = true;
-						}*/
+						}
 					}
 					else if((ipc_icov[taskID] == false) & (idle == false))
 					{
