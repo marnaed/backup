@@ -1126,17 +1126,17 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	LOGINF("--------");
 
 	uint64_t size;
-	double mean, var, q3;
+	double q3;
 
 	/** Calculate limit outlier using 3std **/
-	mean = acc::mean(macc);
-	var = acc::variance(macc);
-	//uint64_t size = all_mpkil3.size();
-	//double q3 = *std::next(all_mpkil3.begin(), size*0.75);
-	double limit_outlier = mean + 1.5*std::sqrt(var);
-	LOGINF("MPKIL3 1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
-	//double limit_outlier = q3;
-	//LOGINF("MPKIL3 LIMIT OUTLIER = {}"_format(limit_outlier));
+	//mean = acc::mean(macc);
+	//var = acc::variance(macc);
+	size = all_mpkil3.size();
+	q3 = *std::next(all_mpkil3.begin(), size*0.75);
+	//double limit_outlier = mean + 1.5*std::sqrt(var);
+	//LOGINF("MPKIL3 1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
+	double limit_outlier = q3;
+	LOGINF("MPKIL3 LIMIT OUTLIER = {}"_format(limit_outlier));
 
 	//mean = acc::mean(hacc);
 	//var = acc::variance(hacc);
