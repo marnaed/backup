@@ -810,6 +810,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	// Set holding all MPKI-L3 values from a given interval
 	// used to compute the value of limit_outlier
 	auto all_mpkil3 = std::set<double>();
+	auto all_hpkil3 = std::set<double>();
 
 	// Apps that have changed to  critical (1) or to non-critical (0)
 	auto status = std::vector<pair_t>();
@@ -1091,6 +1092,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			{
 				res = res + std::to_string(*i) + " ";
 				macc(*i);
+				all_mpkil3.insert(*i);
 			}
 			LOGINF(res);
 		}
@@ -1123,19 +1125,25 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	}
 	LOGINF("--------");
 
+	uint64_t size;
+	double mean, var, q3;
 
 	/** Calculate limit outlier using 3std **/
-	double mean = acc::mean(macc);
-	double var = acc::variance(macc);
+	mean = acc::mean(macc);
+	var = acc::variance(macc);
+	//uint64_t size = all_mpkil3.size();
+	//double q3 = *std::next(all_mpkil3.begin(), size*0.75);
 	double limit_outlier = mean + 1.5*std::sqrt(var);
 	LOGINF("MPKIL3 1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
+	//double limit_outlier = q3;
+	//LOGINF("MPKIL3 LIMIT OUTLIER = {}"_format(limit_outlier));
 
 	//mean = acc::mean(hacc);
 	//var = acc::variance(hacc);
-	uint64_t size = all_hpkil3.size();
+	size = all_hpkil3.size();
     //double q1 = *std::next(all_hpkil3.begin(), size/4);
     //double q2 = *std::next(all_hpkil3.begin(), size/2);
-    double q3 = *std::next(all_hpkil3.begin(), size*0.75);
+    q3 = *std::next(all_hpkil3.begin(), size*0.75);
 	double limit_houtlier = q3;
 	LOGINF("HPKIL3 LIMIT OUTLIER = {}"_format(limit_houtlier));
 
@@ -1213,32 +1221,17 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		}
 		else
         {
-			// it's not a critical app
-			if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < limit_houtlier))
-			{
-				if (itX != id_isolated.end())
-				{
-					LOGINF("The HPKIL3 of task {} is too low ({}) and it's isolated --> EXCLUDED"_format(idTask,HPKIL3Task));
-					if (excluded[idTask] == false)
-						excluded[idTask] = true;
-				}
-				else
-					LOGINF("The HPKIL3 of task {} is too low ({} < {}) to be considered critical"_format(idTask,HPKIL3Task,limit_houtlier));
-
-			}
+			if (itX != id_isolated.end())
+				LOGINF("Isolated task {} cannot be considered as critical!"_format(idTask));
+			else if (HPKIL3Task >= limit_houtlier)
+				LOGINF("The MPKI_L3 of task {} is NOT an outlier, since MPKIL3 {} < {} but  HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
 			else
-			{
-				if (itX != id_isolated.end())
-					LOGINF("Isolated task {} cannot be considered as critical!"_format(idTask));
-				else if (HPKIL3Task >= limit_houtlier)
-					LOGINF("The MPKI_L3 of task {} is NOT an outlier, since MPKIL3 {} < {} but  HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
-				else
-					LOGINF("The MPKI_L3 of task {} is NOT an outlier, since MPKIL3 {} < {} & HPKIL3 {} < {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
+				LOGINF("The MPKI_L3 of task {} is NOT an outlier, since MPKIL3 {} < {} & HPKIL3 {} < {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
 
-				if (excluded[idTask] == true)
-					excluded[idTask] = false;
-			}
-            outlier.push_back(std::make_pair(idTask,0));
+			if (excluded[idTask] == true)
+				excluded[idTask] = false;
+
+			outlier.push_back(std::make_pair(idTask,0));
 			// initialize counter if it's the first interval
 			if(current_interval == firstInterval)
 				frequencyCritical[idTask] = 0;
