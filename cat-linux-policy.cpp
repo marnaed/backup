@@ -810,7 +810,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	// Set holding all MPKI-L3 values from a given interval
 	// used to compute the value of limit_outlier
 	auto all_mpkil3 = std::set<double>();
-	auto all_hpkil3 = std::set<double>();
+	//auto all_hpkil3 = std::set<double>();
 
 	// Apps that have changed to  critical (1) or to non-critical (0)
 	auto status = std::vector<pair_t>();
@@ -828,7 +828,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	uint32_t idTask;
 
 	// Accumulator to calculate mean and std of mpkil3
-	ca_accum_t macc, hacc;
+	ca_accum_t macc;
 
     // Number of critical apps found in the interval
     uint32_t critical_apps = 0;
@@ -926,7 +926,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				/***********ISOLATION MECHANISM*************/
 				// Check if there is a non-critical application occupying more space than it should
 				// // or if an isolated app must be returned to CLOS 1
-				if ((CLOSvalue > 2) & (HPKIL3 > 1))
+				if ((CLOSvalue > 2) & (HPKIL3 > 1) & (ipc < 1))
 				{
 					// If app. is not critical and isolated
 					// return it to CLOS 1 if it is higher than threshold
@@ -992,21 +992,41 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 							ipc_good[taskID] = true;
 						}
 					}
-					else if((ipc_icov[taskID] == false) & (idle == false))
+					else if ((ipc_icov[taskID] == true) & (ipc >= 1))
+					{
+						LOGINF("{}: ipc {} is > 1 and it can stay as critical"_format(taskID,ipc));
+						ipc_phase_change[taskID] = false;
+					}
+					else if ((ipc_icov[taskID] == false) & (idle == false))
 					{
 						//if (ipc >= 0.96*prev_ipc[taskID])
-						if (ipc >= 1)
+						/*if (ipc >= 1)
 						{
 							LOGINF("{}: ipc doing good!!"_format(taskID));
 							ipc_phase_change[taskID] = false;
 							ipc_good[taskID] = true;
-						}
-						else
+						}*/
+						if ((ipc < 1) & (MPKIL3 < 6) & (HPKIL3 > 10))
 						{
 							//LOGINF("{}: ipc {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
 							LOGINF("{}: ipc {} < 1!!"_format(taskID,ipc));
 							ipc_phase_change[taskID] = true;
+							//if ((MPKIL3 < 6) & (HPKIL3 > 10))
+							//{
+							bully_counter[taskID]++;
+							LOGINF("{}: bully_counter++"_format(taskID));
+							//}
 						}
+						else
+						{
+							if (ipc >= 1)
+								LOGINF("{}: ipc doing good!!"_format(taskID));
+							else
+								LOGINF("{}: ipc < 1 but give another chance"_format(taskID));
+							ipc_phase_change[taskID] = false;
+							ipc_good[taskID] = true;
+						}
+
 					}
 
 				}
@@ -1038,6 +1058,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			excluded[taskID]= false;
 			ipc_icov[taskID] = false;
 			ipc_good[taskID] = false;
+			bully_counter[taskID] = 0;
         }
 
 		//prev_ipc[taskID] = ipc;
@@ -1117,8 +1138,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			for (auto i = val.cbegin(); i != val.cend(); ++i)
 			{
 				res = res + std::to_string(*i) + " ";
-				hacc(*i);
-				all_hpkil3.insert(*i);
+				//hacc(*i);
+				//all_hpkil3.insert(*i);
 			}
 			LOGINF(res);
 		}
@@ -1128,7 +1149,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	LOGINF("--------");
 
 	uint64_t size;
-	double q3, q2, limit_outlier, limit_houtlier;
+	double q3, limit_outlier, limit_houtlier;
 
 	/** Calculate limit outlier using 3std **/
 	//mean = acc::mean(macc);
@@ -1145,11 +1166,11 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 	//mean = acc::mean(hacc);
 	//var = acc::variance(hacc);
-	size = all_hpkil3.size();
+	//size = all_hpkil3.size();
     //double q1 = *std::next(all_hpkil3.begin(), size/4);
     //double q2 = *std::next(all_hpkil3.begin(), size/2);
     //q3 = *std::next(all_hpkil3.begin(), size*0.75);
-	q2 = *std::next(all_hpkil3.begin(), size*0.5);
+	//q2 = *std::next(all_hpkil3.begin(), size*0.5);
 	limit_houtlier = 1;
 	LOGINF("HPKIL3 LIMIT OUTLIER = {}"_format(limit_houtlier));
 
@@ -1212,7 +1233,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			}
 			ipc_good[idTask] = false;
 		}
-        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= limit_houtlier) & (IPCTask <= 1))
+        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= limit_houtlier) & (IPCTask <= 1) & (bully_counter[idTask] < 2))
         {
 			LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
 			outlier.push_back(std::make_pair(idTask,1));
@@ -1222,7 +1243,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				excluded[idTask] = false;
 
 		}
-        else if((MPKIL3Task < limit_outlier) & (fractionCritical >= 0.5))
+        else if((MPKIL3Task < limit_outlier) & (fractionCritical >= 0.5) & (itX == id_isolated.end()))
 		{
 			LOGINF("The MPKI_L3 of task {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
 			LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
@@ -1234,6 +1255,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
         {
 			if (itX != id_isolated.end())
 				LOGINF("Isolated task {} cannot be considered as critical!"_format(idTask));
+			else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= limit_houtlier) & (IPCTask <= 1) & (bully_counter[idTask] >= 2))
+				LOGINF("Task {} is a bully --> NON-CRITICAL"_format(idTask));
 			else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= limit_houtlier) & (IPCTask > 1))
 				LOGINF("The IPC of task {} is already good!"_format(idTask));
 			else if (HPKIL3Task >= limit_houtlier)
@@ -1332,10 +1355,12 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
                 taskIsInCRCLOS.push_back(std::make_pair(idTask,2));
                 ipc_CR += ipcTask;
             }
-            else if (CLOSvalue !=3)
+            else if (CLOSvalue < 3)
             {
 				LinuxBase::get_cat()->add_task(1,pidTask);
 				LOGINF("Task ID {} assigned to CLOS 1"_format(idTask));
+				itT = taskIsInCRCLOS.erase(itT);
+				taskIsInCRCLOS.push_back(std::make_pair(idTask,1));
                 ipc_NCR += ipcTask;
             }
 			else if (CLOSvalue >= 3)
