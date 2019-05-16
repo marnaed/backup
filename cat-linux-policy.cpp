@@ -1006,7 +1006,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 							ipc_phase_change[taskID] = false;
 							ipc_good[taskID] = true;
 						}*/
-						if ((ipc < 1) & (MPKIL3 < 6) & (HPKIL3 > 10))
+						if ((ipc < 1) & (MPKIL3 < 6))
 						{
 							//LOGINF("{}: ipc {} is worse than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
 							LOGINF("{}: ipc {} < 1!!"_format(taskID,ipc));
