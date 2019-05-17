@@ -168,11 +168,13 @@ class CriticalAwareV3: public LinuxBase
 	uint64_t CLOS_isolated = 3;
     uint64_t n_isolated_apps = 0;
     uint64_t mask_isolated = 0x00003;
-	std::vector<uint64_t> free_closes = {3, 4, 5};
+	std::vector<uint64_t> free_closes = {3, 4, 5, 7, 8};
 	std::map<uint64_t, uint64_t> clos_mask = {
           { 3, 0x00003 },
           { 4, 0x0000f },
-          { 5, 0x00030 }
+          { 5, 0x00030 },
+		  { 7, 0x000f0 },
+		  { 8, 0x00300 }
 	};
 
 	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
@@ -180,14 +182,11 @@ class CriticalAwareV3: public LinuxBase
 	std::map<uint32_t, std::deque<double>> valid_hpkil3;
 
     // dictionaries holdind phase info for each task
-    std::map<uint32_t, uint64_t> mpkil3_phase_count;
-    std::map<uint32_t, uint64_t> mpkil3_phase_duration;
 	std::map<uint32_t, uint64_t> ipc_phase_count;
     std::map<uint32_t, uint64_t> ipc_phase_duration;
 	std::map<uint32_t, uint64_t> bully_counter;
 
     // dictionary holding sum of MPKIL3 of each application during a given phase
-    std::map<uint32_t, double> mpkil3_sumXij;
 	std::map<uint32_t, double> ipc_sumXij;
 	// Map of windowSizes
     std::map<uint64_t, double> windowSizeM;
