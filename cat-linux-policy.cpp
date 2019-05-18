@@ -996,7 +996,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					}
 					else if ((ipc_icov[taskID] == false) & (idle == false))
 					{
-						if ((ipc < ipc_threshold) & (MPKIL3 < 6))
+						if ((ipc < ipc_threshold) & (MPKIL3 < 4) & (HPKIL3 > 5))
 						{
 							LOGINF("{}: ipc {} < {}!!"_format(taskID,ipc,ipc_threshold));
 							ipc_phase_change[taskID] = true;
@@ -1240,11 +1240,11 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				n_isolated_apps = n_isolated_apps + 1;
 				LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
 
-				auto closIT = free_closes.begin();
-				LOGINF("clos isolated: {}"_format(*closIT));
-				CLOS_isolated = *closIT;
+				auto closIT2 = free_closes.begin();
+				LOGINF("clos isolated: {}"_format(*closIT2));
+				CLOS_isolated = *closIT2;
 				mask_isolated = clos_mask[CLOS_isolated];
-				closIT = free_closes.erase(closIT);
+				closIT2 = free_closes.erase(closIT2);
 
 				LinuxBase::get_cat()->add_task(CLOS_isolated,pidTask);
 				LOGINF("[TEST] {}: bully task -> assigned to CLOS {}"_format(idTask,CLOS_isolated));
