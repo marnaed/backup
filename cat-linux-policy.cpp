@@ -925,49 +925,56 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				/***********ISOLATION MECHANISM*************/
 				// Check if there is a non-critical application occupying more space than it should
 				// // or if an isolated app must be returned to CLOS 1
-				if ((CLOSvalue > 2) & (HPKIL3 >= 1) & (ipc < ipc_threshold) & (bully_counter[taskID] < 2))
+				//if ((CLOSvalue > 2) & (HPKIL3 >= 1) & (ipc < ipc_threshold) & (bully_counter[taskID] < 2))
+				if ((CLOSvalue > 2) & (bully_counter[taskID] < 2))
 				{
-					// If app. is not critical and isolated
-					// return it to CLOS 1 if it is higher than threshold
-					LinuxBase::get_cat()->add_task(1,taskPID);
-					itT = taskIsInCRCLOS.erase(itT);
-					taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+					if ((HPKIL3 >= 1) | (ipc_icov[taskID] == true) | (ipc < 1))
+					{
+						// If app. is not critical and isolated
+						// return it to CLOS 1 if it is higher than threshold
+						LinuxBase::get_cat()->add_task(1,taskPID);
+						itT = taskIsInCRCLOS.erase(itT);
+						taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 
-					excluded[taskID] = false;
+						excluded[taskID] = false;
 
-					LOGINF("[TEST] {}: HPKIL3 is higher than threshold --> return to CLOS 1"_format(taskID));
-					n_isolated_apps = n_isolated_apps - 1;
-					LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+						LOGINF("[TEST] {}: HPKIL3 is higher than threshold --> return to CLOS 1"_format(taskID));
+						n_isolated_apps = n_isolated_apps - 1;
+						LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
 
-					free_closes.push_back(CLOSvalue);
-					id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+						free_closes.push_back(CLOSvalue);
+						id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+					}
 				}
 				else if (CLOSvalue == 1)
 				{
 					double limit_space = num_ways_CLOS_1 / 3;
 					LOGINF("limit_space {} ({})"_format(limit_space,num_ways_CLOS_1));
 					// Check if there is a non-critical application occupying more space than it should
-					if ((l3_occup_mb > limit_space) & (HPKIL3 < 1) & (n_isolated_apps < 3))
+					if (limit_space >= 3)
 					{
-						// Isolate it in a separate CLOS with two exclusive ways
-						n_isolated_apps = n_isolated_apps + 1;
-						LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+						if ((l3_occup_mb > limit_space) & (HPKIL3 < 1) & (n_isolated_apps < 2))
+						{
+							// Isolate it in a separate CLOS with two exclusive ways
+							n_isolated_apps = n_isolated_apps + 1;
+							LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
 
-						auto closIT = free_closes.begin();
-						CLOS_isolated = *closIT;
-						mask_isolated = clos_mask[CLOS_isolated];
-						closIT = free_closes.erase(closIT);
+							auto closIT = free_closes.begin();
+							CLOS_isolated = *closIT;
+							mask_isolated = clos_mask[CLOS_isolated];
+							closIT = free_closes.erase(closIT);
 
-						LinuxBase::get_cat()->add_task(CLOS_isolated,taskPID);
-						LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(taskID,l3_occup_mb,CLOS_isolated));
-						LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
-						LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
+							LinuxBase::get_cat()->add_task(CLOS_isolated,taskPID);
+							LOGINF("[TEST] {}: has l3_occup_mb {} -> assigned to CLOS {}"_format(taskID,l3_occup_mb,CLOS_isolated));
+							LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+							LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 
-						// Update taskIsInCRCLOS
-						itT = taskIsInCRCLOS.erase(itT);
-						taskIsInCRCLOS.push_back(std::make_pair(taskID,CLOS_isolated));
-						id_isolated.push_back(taskID);
-						CLOS_isolated = CLOS_isolated + 1;
+							// Update taskIsInCRCLOS
+							itT = taskIsInCRCLOS.erase(itT);
+							taskIsInCRCLOS.push_back(std::make_pair(taskID,CLOS_isolated));
+							id_isolated.push_back(taskID);
+							CLOS_isolated = CLOS_isolated + 1;
+						}
 					}
 				}
 				else if (CLOSvalue == 2)
