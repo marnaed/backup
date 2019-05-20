@@ -102,6 +102,7 @@ def main():
         plt.ylim(0,15)
         plt.xlim(0,45)
         plt.axvline(x=1, color='k', linestyle='--')
+        plt.axhline(y=1, color='k', linestyle='--')
         ax.grid(True)
 
         # add custom legend
