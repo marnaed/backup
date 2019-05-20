@@ -167,14 +167,13 @@ class CriticalAwareV3: public LinuxBase
 	// Isolation mechanism variables
 	uint64_t CLOS_isolated = 3;
     uint64_t n_isolated_apps = 0;
-    uint64_t mask_isolated = 0x00003;
-	std::vector<uint64_t> free_closes = {3, 4, 5, 7, 8};
+    uint64_t mask_isolated = 0x00007;
+	std::vector<uint64_t> free_closes = {3, 4, 5, 7};
 	std::map<uint64_t, uint64_t> clos_mask = {
-          { 3, 0x00003 },
-          { 4, 0x0000f },
-          { 5, 0x00030 },
-		  { 7, 0x000f0 },
-		  { 8, 0x00300 }
+          { 3, 0x00007 },
+          { 4, 0x00038 },
+          { 5, 0x001c0 },
+		  { 7, 0x00e00 }
 	};
 
 	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
