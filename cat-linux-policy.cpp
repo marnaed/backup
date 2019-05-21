@@ -902,8 +902,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				ipc_sumXij[taskID] = ipc;
 				ipc_icov[taskID] = true;
 
-				if ((bully_counter[taskID] >= 2) & (ipc >= ipc_threshold))
+				if ((CLOSvalue > 2) & (bully_counter[taskID] >= 2) & (ipc >= ipc_threshold))
 				{
+					free_closes.push_back(CLOSvalue);
+					LOGINF("[TEST] CLOS {} pushed back to free_closes"_format(CLOSvalue));
 					LinuxBase::get_cat()->add_task(1,taskPID);
 					itT = taskIsInCRCLOS.erase(itT);
 					taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
@@ -914,7 +916,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					n_isolated_apps = n_isolated_apps - 1;
 					LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
 
-					free_closes.push_back(CLOSvalue);
 					id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
 
 				}
@@ -932,6 +933,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					{
 						// If app. is not critical and isolated
 						// return it to CLOS 1 if it is higher than threshold
+						free_closes.push_back(CLOSvalue);
 						LinuxBase::get_cat()->add_task(1,taskPID);
 						itT = taskIsInCRCLOS.erase(itT);
 						taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
@@ -941,8 +943,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						LOGINF("[TEST] {}: HPKIL3 is higher than threshold --> return to CLOS 1"_format(taskID));
 						n_isolated_apps = n_isolated_apps - 1;
 						LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
-
-						free_closes.push_back(CLOSvalue);
 						id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
 					}
 				}
@@ -953,7 +953,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					// Check if there is a non-critical application occupying more space than it should
 					if (limit_space >= 3)
 					{
-						if ((l3_occup_mb > limit_space) & (HPKIL3 < 1) & (n_isolated_apps < 2))
+						if ((l3_occup_mb > limit_space) & (HPKIL3 < 1) & (MPKIL3 < 1) & (n_isolated_apps < 2))
 						{
 							// Isolate it in a separate CLOS with two exclusive ways
 							n_isolated_apps = n_isolated_apps + 1;
@@ -1003,7 +1003,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					}
 					else if ((ipc_icov[taskID] == false) & (idle == false))
 					{
-						if ((ipc < ipc_threshold) & (MPKIL3 < 4) & (HPKIL3 > 5))
+						if ((MPKIL3 < 6) & (HPKIL3 > 5) & (ipc < ipc_threshold))
 						{
 							LOGINF("{}: ipc {} < {}!!"_format(taskID,ipc,ipc_threshold));
 							ipc_phase_change[taskID] = true;
