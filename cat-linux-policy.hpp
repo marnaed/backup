@@ -141,6 +141,7 @@ class CriticalAwareV3: public LinuxBase
 	uint64_t IDLE_INTERVALS = 1;
 	double ipc_threshold = 0;
 	double fraction_mpkil3 = 1;
+	double ipc_ICOV_threshold = fraction_mpkil3;
 
     //Masks of CLOS
     uint64_t maskCrCLOS = 0xfffff;
@@ -178,7 +179,6 @@ class CriticalAwareV3: public LinuxBase
 
 	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
     std::map<uint32_t, std::deque<double>> valid_mpkil3;
-	std::map<uint32_t, std::deque<double>> valid_hpkil3;
 
     // dictionaries holdind phase info for each task
 	std::map<uint32_t, uint64_t> ipc_phase_count;
@@ -234,6 +234,8 @@ class CriticalAwareV3: public LinuxBase
 
     //configure CAT
 	void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
+	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue);
+	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it);
 	virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
 
 };

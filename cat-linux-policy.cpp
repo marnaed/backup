@@ -1046,7 +1046,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			// Add a new entry in the dictionary
 			LOGINF("NEW ENTRY IN DICT valid_mpkil3 added");
 			valid_mpkil3[taskID].push_front(MPKIL3);
-			valid_hpkil3[taskID].push_front(HPKIL3);
 			taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 			windowSizeM[taskID] = windowSize;
 			ipc_phase_count[taskID] = 1;
