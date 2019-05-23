@@ -1054,7 +1054,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
             ipc_sumXij[taskID] = ipc;
 			ipc_phase_change[taskID] = false;
 			excluded[taskID]= false;
-			//ipc_icov[taskID] = false;
 			ipc_good[taskID] = false;
 			bully_counter[taskID] = 0;
         }
@@ -1120,31 +1119,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			LOGINF("Task {} is excluded!!!"_format(idTask));
 	}
 
-	/*LOGINF("--------");
-	LOGINF("-HPKIL3-");
-	for (auto const &x : valid_hpkil3)
-	{
-		// Get deque
-		std::deque<double> val = x.second;
-		idTask = x.first;
-		std::string res;
-
-		// Add values
-		if (excluded[idTask] == false)
-		{
-			for (auto i = val.cbegin(); i != val.cend(); ++i)
-			{
-				res = res + std::to_string(*i) + " ";
-				//hacc(*i);
-				//all_hpkil3.insert(*i);
-			}
-			LOGINF(res);
-		}
-		else
-			LOGINF("Task {} is excluded!!!"_format(idTask));
-	}
-	LOGINF("--------");*/
-
 	uint64_t size;
 	double q3, limit_outlier, limit_houtlier;
 
@@ -1161,13 +1135,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		limit_outlier = 1;
 	LOGINF("MPKIL3 LIMIT OUTLIER = {}"_format(limit_outlier));
 
-	//mean = acc::mean(hacc);
-	//var = acc::variance(hacc);
-	//size = all_hpkil3.size();
-    //double q1 = *std::next(all_hpkil3.begin(), size/4);
-    //double q2 = *std::next(all_hpkil3.begin(), size/2);
-    //q3 = *std::next(all_hpkil3.begin(), size*0.75);
-	//q2 = *std::next(all_hpkil3.begin(), size*0.5);
 	limit_houtlier = 1;
 	LOGINF("HPKIL3 LIMIT OUTLIER = {}"_format(limit_houtlier));
 
@@ -1177,19 +1144,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
     {
         double MPKIL3Task = std::get<1>(item);
         idTask = std::get<0>(item);
-		//int freqCritical = -1;
-		//double fractionCritical = 0;
-
-		/*if(current_interval > firstInterval)
-		{
-			//Search for mi tuple and update the value
-			auto it = frequencyCritical.find(idTask);
-			if(it != frequencyCritical.end())
-				freqCritical = it->second;
-			assert(freqCritical>=0);
-			fractionCritical = freqCritical / (double)(current_interval-firstInterval);
-			//LOGINF("Fraction Critical ({} / {}) = {}"_format(freqCritical,(current_interval-firstInterval),fractionCritical));
-		}*/
 
 		// Check if application is isolated
 		auto itX = std::find (id_isolated.begin(), id_isolated.end(), idTask);
@@ -1216,7 +1170,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				LOGINF("The critical task {} has not changed phase and is doing good--> CRITICAL"_format(idTask));
 				outlier.push_back(std::make_pair(idTask,1));
             	critical_apps = critical_apps + 1;
-            	//frequencyCritical[idTask]++;
 			}
 			else
 			{
@@ -1231,18 +1184,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
 			outlier.push_back(std::make_pair(idTask,1));
 			critical_apps = critical_apps + 1;
-			//frequencyCritical[idTask]++;
 			if (excluded[idTask] == true)
 				excluded[idTask] = false;
 
 		}
-        /*else if((MPKIL3Task < limit_outlier) & (fractionCritical >= 0.5) & (itX == id_isolated.end()))
-		{
-			LOGINF("The MPKI_L3 of task {} is NOT an outlier, since {} < {}"_format(idTask,MPKIL3Task,limit_outlier));
-			LOGINF("Fraction critical of {} is {} --> CRITICAL"_format(idTask,fractionCritical));
-			outlier.push_back(std::make_pair(idTask,1));
-            critical_apps = critical_apps + 1;
-		}*/
 		else
         {
 			if (itX != id_isolated.end())
@@ -1264,7 +1209,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			outlier.push_back(std::make_pair(idTask,0));
         }
 
-		//ipc_icov[idTask] = false;
 		prev_ipc[idTask] = IPCTask;
 
     }
