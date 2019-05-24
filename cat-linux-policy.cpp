@@ -859,7 +859,7 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 					double limit_space = num_ways_CLOS1 / 3;
 					if (limit_space >= 3)
 					{
-						if ((l3_occup_mb > limit_space) & (HPKIL3 < 1) & (MPKIL3 < 1) & (n_isolated_apps < 2))
+						if ((l3_occup_mb > limit_space) & (HPKIL3 < 1) & (n_isolated_apps < 2))
 						{
 							// Isolate it in a separate CLOS with two exclusive ways
 							LOGINF("[TEST] {}: has l3_occup_mb {} -> isolate!"_format(taskID,l3_occup_mb));
@@ -910,13 +910,6 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 									ipc_phase_change[taskID] = true;
 								}
 							}
-							/*else if ((ipc < 1) & (MPKIL3 < 2))
-							{
-								LOGINF("{}: ipc {} < {}, mpkil3 {} and hpkil3 {}!!"_format(taskID,ipc,ipc_threshold,MPKIL3,HPKIL3));
-								ipc_phase_change[taskID] = true;
-								bully_counter[taskID]++;
-								LOGINF("{}: bully_counter++"_format(taskID));
-							}*/
 							else
 							{
 								LOGINF("{}: ipc {} is doing good !!"_format(taskID,ipc));
@@ -1604,7 +1597,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				else if ((CLOSvalue > 2) & (bully_counter[taskID] < 2))
 				{ // ISOLATED APP
-					if ((HPKIL3 >= 1) | ((ipc_ICOV >= ipc_ICOV_threshold) & (ipc < 0.96*prev_ipc[taskID])))
+					if ((HPKIL3 >= 1) & (ipc_ICOV >= ipc_ICOV_threshold) & (ipc < 0.96*prev_ipc[taskID]))
 					{
 						LOGINF("{}: isolated task has higher HPKIL3 or changed to worse ipc phase --> CLOS 1"_format(taskID));
 						include_application(taskID,taskPID,itT,CLOSvalue);
