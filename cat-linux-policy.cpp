@@ -743,6 +743,7 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
     double ipc_NCR = 0;
 	double l3_occup_mb_total = 0;
 	double ipc_ICOV = 0;
+	double NCR_occupancy = 0;
 
 	uint32_t idTask;
 
@@ -799,10 +800,11 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 			while (deque_mpkil3.size() >= windowSize)
 				deque_mpkil3.pop_back();
 
+			// Find current CLOS hosting the task
 			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
             uint64_t CLOSvalue = std::get<1>(*itT);
-			LOGINF("{}: CLOS {}"_format(taskID,CLOSvalue));
 
+			// Find current state of task
 			auto itS = std::find_if(status.begin(), status.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
        		uint64_t state = std::get<1>(*itS);
 
@@ -820,15 +822,13 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 				ipc_phase_count[taskID] += 1;
 				ipc_phase_duration[taskID] = 1;
 				ipc_sumXij[taskID] = ipc;
-				ipc_icov[taskID] = true;
+				//ipc_icov[taskID] = true;
 			}
 
 			if (current_interval >= firstInterval)
 			{
-				/***********ISOLATION MECHANISM*************/
-				// Check if a bully app must be returned to CLOS 1
-				//if ((ipc_ICOV >= 0.15) & (MPKIL3 < 6) & (HPKIL3 < 15) & (state == 3))
-				if ((ipc_ICOV >= 0.15) & (state == 3))
+				// Check if a bully app (state 3) must be returned to CLOS 1
+				if ( ( ((ipc_ICOV >= ipc_ICOV_threshold) & (HPKIL3 < 10)) | (ipc < 0.4)) & (state == 3))
 				{
 					LOGINF("{}: bully task has changed to higher IPC phase --> CLOS 1"_format(taskID));
 					include_application(taskID,taskPID,itT,CLOSvalue);
@@ -838,9 +838,9 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 					bully_counter[taskID]--;
 
 				}
-				else if (state == 2)
+				else if (state == 2) // Check if an isolated app (state 2) must be returned to CLOS 1
 				{
-					if ((HPKIL3 >= 1) | ((ipc_ICOV >= ipc_ICOV_threshold) & (ipc < 0.96*prev_ipc[taskID])))
+					if ((HPKIL3 >= 1) & (MPKIL3 >= 1) & ((ipc_ICOV >= ipc_ICOV_threshold) & (ipc < 0.96*prev_ipc[taskID])))
 					{
 						LOGINF("{}: isolated task has higher HPKIL3 or changed to worse ipc phase --> CLOS 1"_format(taskID));
 						include_application(taskID,taskPID,itT,CLOSvalue);
@@ -848,19 +848,18 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 						status.push_back(std::make_pair(taskID,0));
 					}
 				}
-				else if ((state == 0) & (CLOSvalue == 1))
+				else if ((state == 0) & (CLOSvalue == 1)) // Non-critical app (state 0)
 				{
+					NCR_occupancy += l3_occup_mb;
 					if ((ipc > 1.7) & (MPKIL3 < 1) & (HPKIL3 < 1) & (l3_occup_mb <= 2))
 					{
 						LOGINF("{}: pushed back to id_verynoncr"_format(taskID));
 						id_verynoncr.push_back(taskID);
 					}
 					double limit_space = num_ways_CLOS1 / 3;
-					//LOGINF("limit_space {} ({})"_format(limit_space,num_ways_CLOS_1));
-					// Check if there is a non-critical application occupying more space than it should
-					if (limit_space >= 6)
+					if (limit_space >= 3)
 					{
-						if ((l3_occup_mb > limit_space) & (HPKIL3 < 1) & (n_isolated_apps < 2))
+						if ((l3_occup_mb > limit_space) & (HPKIL3 < 1) & (MPKIL3 < 1) & (n_isolated_apps < 2))
 						{
 							// Isolate it in a separate CLOS with two exclusive ways
 							LOGINF("[TEST] {}: has l3_occup_mb {} -> isolate!"_format(taskID,l3_occup_mb));
@@ -870,17 +869,20 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 						}
 					}
 				}
-				else if (state == 1)
+				else if (state == 1) // Critical app (state 1)
 				{
-					/***********PHASE DETECTION*****************/
-					// Detect phase changes only in apps which are critical
-					// IF app has changed phase and new phase is lower ---> check again if it is still critical
 					if (ipc_ICOV >= ipc_ICOV_threshold)
 					{
 						if ((ipc < 0.96*prev_ipc[taskID]) & (ipc < ipc_threshold))
 						{
 							LOGINF("{}: ipc in new phase {} is worse than previous ({}) and less than {}!"_format(taskID,ipc,0.96*prev_ipc[taskID],ipc_threshold));
 							ipc_phase_change[taskID] = true;
+						}
+						else if ((ipc < 0.96*prev_ipc[taskID]) & (ipc >= ipc_threshold))
+						{
+							LOGINF("{}: ipc in new phase {} is worse than previous ({}) but more than {}!"_format(taskID,ipc,0.96*prev_ipc[taskID],ipc_threshold));
+							ipc_phase_change[taskID] = false;
+							ipc_good[taskID] = true;
 						}
 						else
 						{
@@ -895,26 +897,26 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 						{
 							if (ipc < ipc_threshold)
 							{
-								//if ((MPKIL3 < 6) & (HPKIL3 > 15))
-								//{
+								if (HPKIL3 > 10)
+								{
 									LOGINF("{}: ipc {} < {}, mpkil3 {} and hpkil3 {}!!"_format(taskID,ipc,ipc_threshold,MPKIL3,HPKIL3));
 									ipc_phase_change[taskID] = true;
 									bully_counter[taskID]++;
 									LOGINF("{}: bully_counter++"_format(taskID));
-								//}
-								//else
-								//{
+								}
+								else
+								{
 									LOGINF("{}: ipc is lower than {}!!"_format(taskID,ipc_threshold));
 									ipc_phase_change[taskID] = true;
-								//}
+								}
 							}
-							else if ((ipc < 1) & (MPKIL3 < 2))
+							/*else if ((ipc < 1) & (MPKIL3 < 2))
 							{
 								LOGINF("{}: ipc {} < {}, mpkil3 {} and hpkil3 {}!!"_format(taskID,ipc,ipc_threshold,MPKIL3,HPKIL3));
 								ipc_phase_change[taskID] = true;
 								bully_counter[taskID]++;
 								LOGINF("{}: bully_counter++"_format(taskID));
-							}
+							}*/
 							else
 							{
 								LOGINF("{}: ipc {} is doing good !!"_format(taskID,ipc));
@@ -962,6 +964,7 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 	}
 
 	LOGINF("Total L3 occupation: {}"_format(l3_occup_mb_total));
+	LOGINF("CLOS 1 L3 occupation ({}): {}"_format(num_ways_CLOS1,NCR_occupancy));
 
 	// Perform no further action if cache-warmup time has not passed
     if ((current_interval < firstInterval) | (idle))
@@ -1036,7 +1039,7 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 		limit_outlier = 1;
 	LOGINF("MPKIL3 LIMIT OUTLIER = {}"_format(limit_outlier));
 
-	limit_houtlier = 0.5;
+	limit_houtlier = 0;
 	LOGINF("HPKIL3 LIMIT OUTLIER = {}"_format(limit_houtlier));
 
 
@@ -1086,7 +1089,7 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 			}
 			ipc_good[idTask] = false;
 		}
-        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= limit_houtlier) & (IPCTask <= 1.3) & (bully_counter[idTask] < 2))
+        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= limit_houtlier) & (IPCTask <= 1) & (bully_counter[idTask] < 2))
         {
 			LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
 			critical.push_back(idTask);
@@ -1113,7 +1116,7 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 			}
 			else
 			{
-				if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= limit_houtlier) & (IPCTask > 1.3))
+				if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= limit_houtlier) & (IPCTask > 1))
 					LOGINF("The IPC of task {} is already good!"_format(idTask));
 				else if (HPKIL3Task >= limit_houtlier)
 					LOGINF("The MPKI_L3 of task {} is NOT an outlier, since MPKIL3 {} < {} but HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
@@ -1138,35 +1141,35 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 		{
 			case 1:
 				// 1 critical app = 12cr10others
-				mask_CLOS1 = 0x003ff;
-				mask_CLOS2 = 0xfff00;
+				mask_CLOS1 = 0x001ff; //0x003ff;
+				mask_CLOS2 = 0xfff80; //0xfff00;
 				mask_CLOS3 = 0xfffff;
 				mask_CLOS4 = 0xfffff;
-				num_ways_CLOS1 = 10;
-				num_ways_CLOS2 = 12;
+				num_ways_CLOS1 = 9; //10;
+				num_ways_CLOS2 = 13; //12;
 				num_ways_CLOS3 = 20;
 				num_ways_CLOS4 = 20;
 				break;
 			case 2:
 				// 2 critical apps = 13cr9others
-				mask_CLOS1 = 0x0003f;
-				mask_CLOS2 = 0xff000;
-				mask_CLOS3 = 0x03fc0;
+				mask_CLOS1 = 0x0000f; //0x0003f;
+				mask_CLOS2 = 0xff800; //0xff000;
+				mask_CLOS3 = 0x01ff0; //0x03fc0;
 				mask_CLOS4 = 0xfffff;
-				num_ways_CLOS1 = 6;
-				num_ways_CLOS2 = 8;
-				num_ways_CLOS3 = 8;
+				num_ways_CLOS1 = 4; //6;
+				num_ways_CLOS2 = 9; //8;
+				num_ways_CLOS3 = 9; //8;
 				num_ways_CLOS4 = 20;
 				break;
 			case 3:
-				mask_CLOS1 = 0x00007;
-				mask_CLOS2 = 0xfc000;
-				mask_CLOS3 = 0x07f00;
-				mask_CLOS4 = 0x001f8;
-				num_ways_CLOS1 = 3;
-				num_ways_CLOS2 = 6;
-				num_ways_CLOS3 = 7;
-				num_ways_CLOS4 = 6;
+				mask_CLOS1 = 0x00003; //0x00007;
+				mask_CLOS2 = 0xfe000; //0xfc000;
+				mask_CLOS3 = 0x07f00; //0x07f00;
+				mask_CLOS4 = 0x001fc;  //0x001f8;
+				num_ways_CLOS1 = 7; //3;
+				num_ways_CLOS2 = 8; //6;
+				num_ways_CLOS3 = 7; //7;
+				num_ways_CLOS4 = 2; //6;
 				break;
 			default:
 				// no critical apps or more than 3 = 20cr20others
@@ -1285,6 +1288,8 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 			}
 		}
 	}
+	else
+		idle = true;
 
 	LOGINF("-----------------------------");
 
