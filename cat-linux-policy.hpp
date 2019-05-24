@@ -132,6 +132,112 @@ class CriticalAware: public LinuxBase
 };
 typedef CriticalAware CA;
 
+class CriticalAwareV4: public LinuxBase
+{
+    protected:
+    uint64_t every = -1;
+    uint64_t firstInterval = 1;
+	uint64_t IDLE_INTERVALS = 1;
+	double ipc_threshold = 0;
+	double ipc_ICOV_threshold = 1;
+
+    //Masks of CLOS
+	uint64_t num_ways_CLOS1 = 20;
+    uint64_t num_ways_CLOS2 = 20;
+	uint64_t num_ways_CLOS4 = 20;
+	uint64_t num_ways_CLOS3 = 20;
+ 	uint64_t mask_CLOS1 = 0xfffff;
+    uint64_t mask_CLOS2 = 0xfffff;
+	uint64_t mask_CLOS3 = 0xfffff;
+	uint64_t mask_CLOS4 = 0xfffff;
+
+	uint64_t prev_critical_apps = 0;
+    //int64_t num_shared_ways = 0;
+
+	uint64_t windowSize = 10;
+
+	bool firstTime = true;
+
+    //Control of the changes made in the masks
+    //uint64_t state = 0;
+    double expectedIPCtotal = 0;
+    double ipc_CR_prev = 0;
+    double ipc_NCR_prev = 0;
+
+	// Limit outlier calculation variables
+    double mpkiL3Mean = 0;
+	double stdmpkiL3Mean = 0;
+
+	// Isolation mechanism variables
+	uint64_t CLOS_isolated = 5;
+    uint64_t n_isolated_apps = 0;
+    uint64_t mask_isolated = 0x00007;
+	std::vector<uint64_t> free_closes = {5, 6, 7};
+	std::map<uint64_t, uint64_t> clos_mask = {
+          { 5, 0x00007 },
+          { 6, 0x00038 },
+          { 7, 0x001c0 }
+	};
+
+	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
+    std::map<uint32_t, std::deque<double>> valid_mpkil3;
+
+    // dictionaries holdind phase info for each task
+	std::map<uint32_t, uint64_t> ipc_phase_count;
+    std::map<uint32_t, uint64_t> ipc_phase_duration;
+	std::map<uint32_t, uint64_t> bully_counter;
+
+    // dictionary holding sum of MPKIL3 of each application during a given phase
+	std::map<uint32_t, double> ipc_sumXij;
+
+	// Set to true if app has HPKIL3 low and high MPKIL3
+	// In order for next interval to not contaminate
+	// set of MPKIL3 values
+	std::map<uint64_t, bool> excluded;
+	std::map<uint64_t, bool> ipc_phase_change;
+	std::map<uint64_t, bool> ipc_icov;
+	std::map<uint64_t, bool> ipc_good;
+
+    uint64_t idle_count = IDLE_INTERVALS;
+    bool idle = false;
+
+	// Define accumulators
+    typedef acc::accumulator_set<
+        double, acc::stats<
+            acc::tag::mean,
+            acc::tag::variance,
+            acc::tag::count
+        >
+    >
+    ca_accum_t;
+
+	std::map<uint64_t, double> prev_ipc;
+
+    //vector to store if task is assigned to critical CLOS
+	typedef std::tuple<uint32_t, uint64_t> pair_t;
+    typedef std::tuple<uint32_t, double> pairD_t;
+	typedef std::tuple<uint32_t, pid_t> pair32P_t;
+    std::vector<pair_t> taskIsInCRCLOS;
+	std::vector<pair_t> status;
+	std::vector<pair32P_t> id_pid;
+	std::vector<uint32_t> id_isolated;
+
+    public:
+
+	//typedef std::tuple<pid_t, uint64_t> pair_t
+
+    CriticalAwareV4(uint64_t _every, uint64_t _firstInterval, uint64_t _IDLE_INTERVALS, double _ipc_threshold, double _ipc_ICOV_threshold) : every(_every), firstInterval(_firstInterval),IDLE_INTERVALS(_IDLE_INTERVALS), ipc_threshold(_ipc_threshold), ipc_ICOV_threshold(_ipc_ICOV_threshold) {}
+
+    virtual ~CriticalAwareV4() = default;
+
+    //configure CAT
+	void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
+	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue);
+	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it);
+	virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
+
+};
+typedef CriticalAwareV4 CAV4;
 
 class CriticalAwareV3: public LinuxBase
 {
