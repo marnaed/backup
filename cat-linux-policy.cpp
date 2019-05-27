@@ -1082,7 +1082,7 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 			}
 			ipc_good[idTask] = false;
 		}
-        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= limit_houtlier) & (IPCTask <= 1) & (bully_counter[idTask] < 2))
+        else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= limit_houtlier) & (IPCTask <= 1.3) & (bully_counter[idTask] < 2))
         {
 			LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
 			critical.push_back(idTask);
@@ -1109,7 +1109,7 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
 			}
 			else
 			{
-				if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= limit_houtlier) & (IPCTask > 1))
+				if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= limit_houtlier) & (IPCTask > 1.3))
 					LOGINF("The IPC of task {} is already good!"_format(idTask));
 				else if (HPKIL3Task >= limit_houtlier)
 					LOGINF("The MPKI_L3 of task {} is NOT an outlier, since MPKIL3 {} < {} but HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
