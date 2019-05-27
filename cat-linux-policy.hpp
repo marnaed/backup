@@ -249,8 +249,14 @@ class CriticalAwareV3: public LinuxBase
 	double ipc_ICOV_threshold = 1;
 
     //Masks of CLOS
-    uint64_t maskCrCLOS = 0xfffff;
+    //uint64_t maskCrCLOS = 0xfffff;
+	uint32_t critical_apps = 0;
+	uint64_t maskCLOS2 = 0xfffff;
+	uint64_t maskCLOS3 = 0xfffff;
+	uint64_t maskCLOS4 = 0xfffff;
     uint64_t num_ways_CLOS_2 = 20;
+	uint64_t num_ways_CLOS_3 = 20;
+	uint64_t num_ways_CLOS_4 = 20;
     uint64_t maskNonCrCLOS = 0xfffff;
     uint64_t num_ways_CLOS_1 = 20;
 	uint64_t prev_critical_apps = 0;
@@ -271,16 +277,18 @@ class CriticalAwareV3: public LinuxBase
 	double stdmpkiL3Mean = 0;
 
 	// Isolation mechanism variables
-	uint64_t CLOS_isolated = 3;
+	uint64_t CLOS_isolated = 5;
     uint64_t n_isolated_apps = 0;
     uint64_t mask_isolated = 0x00007;
-	std::vector<uint64_t> free_closes = {3, 4, 5, 7};
+	std::vector<uint64_t> free_closes = {5, 6, 7};
 	std::map<uint64_t, uint64_t> clos_mask = {
-          { 3, 0x00007 },
-          { 4, 0x00038 },
-          { 5, 0x001c0 },
-		  { 7, 0x00e00 }
+          { 5, 0x00007 },
+          { 6, 0x00038 },
+          { 7, 0x001c0 }
 	};
+
+	std::map<uint64_t,double> LLCoccup_critical;
+	std::set<uint32_t> CLOS_critical = {2, 3, 4};
 
 	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
     std::map<uint32_t, std::deque<double>> valid_mpkil3;
@@ -341,6 +349,7 @@ class CriticalAwareV3: public LinuxBase
 	void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
 	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue);
 	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it);
+	void divide_2_critical(uint64_t numWaysCLOS2, uint64_t clos);
 	virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
 
 };
