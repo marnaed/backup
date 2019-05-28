@@ -244,9 +244,11 @@ class CriticalAwareV3: public LinuxBase
     protected:
     uint64_t every = -1;
     uint64_t firstInterval = 1;
-	uint64_t IDLE_INTERVALS = 1;
-	double ipc_threshold = 0;
-	double ipc_ICOV_threshold = 1;
+	uint64_t idleIntervals = 1;
+	double ipcLow = 0;
+	double ipcMedium = 0;
+	double icov = 1;
+	double hpkil3Limit = 0;
 
     //Masks of CLOS
     //uint64_t maskCrCLOS = 0xfffff;
@@ -314,7 +316,7 @@ class CriticalAwareV3: public LinuxBase
 
 	bool limit = false;
 
-    uint64_t idle_count = IDLE_INTERVALS;
+    uint64_t idle_count = idleIntervals;
     bool idle = false;
 
 	// Define accumulators
@@ -344,7 +346,7 @@ class CriticalAwareV3: public LinuxBase
 
 	//typedef std::tuple<pid_t, uint64_t> pair_t
 
-    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _IDLE_INTERVALS, double _ipc_threshold, double _ipc_ICOV_threshold) : every(_every), firstInterval(_firstInterval),IDLE_INTERVALS(_IDLE_INTERVALS), ipc_threshold(_ipc_threshold), ipc_ICOV_threshold(_ipc_ICOV_threshold) {}
+    CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _idleIntervals, double _ipcMedium, double _ipcLow, double _icov, double _hpkil3Limit) : every(_every), firstInterval(_firstInterval), idleIntervals(_idleIntervals), ipcLow(_ipcLow), ipcMedium(_ipcMedium), icov(_icov), hpkil3Limit(_hpkil3Limit) {}
 
     virtual ~CriticalAwareV3() = default;
 

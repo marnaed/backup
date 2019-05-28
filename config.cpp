@@ -107,7 +107,7 @@ std::shared_ptr<cat::policy::Base> config_read_cat_policy(const YAML::Node &conf
 		LOGINF("Using Critical-Aware (cav3) CAT policy");
 
 		// Check that required fields exist
-		for (string field : {"every", "firstInterval", "IDLE_INTERVALS", "ipc_threshold", "ipc_ICOV_threshold"})
+		for (string field : {"every", "firstInterval", "idleIntervals", "ipcLow", "ipcMedium", "icov", "hpkil3Limit"})
 		{
 			if (!policy[field])
 				throw_with_trace(std::runtime_error("The '" + kind + "' CAT policy needs the '" + field + "' field"));
@@ -115,11 +115,13 @@ std::shared_ptr<cat::policy::Base> config_read_cat_policy(const YAML::Node &conf
 		// Read fields
 		uint64_t every = policy["every"].as<uint64_t>();
 		uint64_t firstInterval = policy["firstInterval"].as<uint64_t>();
-		uint64_t IDLE_INTERVALS = policy["IDLE_INTERVALS"].as<uint64_t>();
-		double ipc_threshold = policy["ipc_threshold"].as<double>();
-		double ipc_ICOV_threshold = policy["ipc_ICOV_threshold"].as<double>();
+		uint64_t idleIntervals = policy["idleIntervals"].as<uint64_t>();
+		double ipcLow = policy["ipcLow"].as<double>();
+		double ipcMedium = policy["ipcMedium"].as<double>();
+		double icov = policy["icov"].as<double>();
+		double hpkil3Limit = policy["hpkil3Limit"].as<double>();
 
-		return std::make_shared<cat::policy::CriticalAwareV3>(every, firstInterval, IDLE_INTERVALS, ipc_threshold, ipc_ICOV_threshold);
+		return std::make_shared<cat::policy::CriticalAwareV3>(every, firstInterval, idleIntervals, ipcMedium, ipcLow, icov, hpkil3Limit);
 	}
 	else if (kind == "cav2")
     {
