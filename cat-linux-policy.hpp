@@ -295,6 +295,7 @@ class CriticalAwareV3: public LinuxBase
 
     // dictionaries holdind phase info for each task
 	std::map<uint32_t, uint64_t> ipc_phase_count;
+	std::map<uint32_t, uint64_t> limit_task;
     std::map<uint32_t, uint64_t> ipc_phase_duration;
 	std::map<uint32_t, uint64_t> bully_counter;
 
@@ -308,8 +309,10 @@ class CriticalAwareV3: public LinuxBase
 	// set of MPKIL3 values
 	std::map<uint64_t, bool> excluded;
 	std::map<uint64_t, bool> ipc_phase_change;
+	std::map<uint64_t, bool> SUPERipc_phase_change;
 	std::map<uint64_t, bool> ipc_icov;
-	std::map<uint64_t, bool> ipc_good;
+
+	bool limit = false;
 
     uint64_t idle_count = IDLE_INTERVALS;
     bool idle = false;
@@ -349,7 +352,8 @@ class CriticalAwareV3: public LinuxBase
 	void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
 	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue);
 	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it);
-	void divide_2_critical(uint64_t numWaysCLOS2, uint64_t clos);
+	void divide_2_critical(uint64_t clos);
+	void divide_3_critical(uint64_t clos);
 	virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
 
 };
