@@ -1673,9 +1673,9 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				else if ((CLOSvalue > 4) & (bully_counter[taskID] < 2))
 				{ // ISOLATED APP
-					if ((HPKIL3 >= 1) & (ipc_ICOV >= ipc_ICOV_threshold) & (ipc < 0.96*prev_ipc[taskID]))
+					if ((HPKIL3 >= 1) & (ipc_ICOV >= ipc_ICOV_threshold))
 					{
-						LOGINF("{}: isolated task has higher HPKIL3 or changed to worse ipc phase --> CLOS 1"_format(taskID));
+						LOGINF("{}: isolated task has higher HPKIL3 or changed IPC phase --> CLOS 1"_format(taskID));
 						include_application(taskID,taskPID,itT,CLOSvalue);
 					}
 				}
@@ -1728,15 +1728,13 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 								if (HPKIL3 > 10)
 								{
 									LOGINF("{}: ipc {} < {}, hpkil3 {}!!"_format(taskID,ipc,ipc_threshold,HPKIL3));
-									ipc_phase_change[taskID] = true;
 									bully_counter[taskID]++;
 									LOGINF("{}: bully_counter++"_format(taskID));
 								}
 								else
-								{
 									LOGINF("{}: ipc is lower than {}!!"_format(taskID,ipc_threshold));
-									ipc_phase_change[taskID] = true;
-								}
+
+								ipc_phase_change[taskID] = true;
 							}
 							else
 							{
