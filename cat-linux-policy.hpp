@@ -279,15 +279,23 @@ class CriticalAwareV3: public LinuxBase
 	double stdmpkiL3Mean = 0;
 
 	// Isolation mechanism variables
-	uint64_t CLOS_isolated = 5;
     uint64_t n_isolated_apps = 0;
-    uint64_t mask_isolated = 0x00007;
-	std::vector<uint64_t> free_closes = {5, 6, 7};
+	uint64_t n_bully_apps = 0;
+	std::vector<uint64_t> isolated_closes = {5, 6};
+	std::vector<uint64_t> bully_closes = {7, 8};
 	std::map<uint64_t, uint64_t> clos_mask = {
-          { 5, 0x00007 },
-          { 6, 0x00038 },
-          { 7, 0x001c0 }
+          { 5, 0x00003 },
+          { 6, 0x0000c },
+          { 7, 0x000f0 },
+		  { 8, 0x00f00 },
 	};
+	//{ 5, 0x00007 },
+   // { 6, 0x00038 },
+	//{ 7, 0x003c0 },
+	//{ 8, 0x03c00 },
+
+	std::vector<uint32_t> id_isolated;
+	std::vector<uint32_t> id_bully;
 
 	std::map<uint64_t,double> LLCoccup_critical;
 	std::set<uint32_t> CLOS_critical = {2, 3, 4};
@@ -337,7 +345,6 @@ class CriticalAwareV3: public LinuxBase
 	typedef std::tuple<uint32_t, pid_t> pair32P_t;
     std::vector<pair_t> taskIsInCRCLOS;
 	std::vector<pair32P_t> id_pid;
-	std::vector<uint32_t> id_isolated;
 
 	// number of times a task has been critical
 	std::map<pid_t,uint64_t> frequencyCritical;
@@ -352,7 +359,7 @@ class CriticalAwareV3: public LinuxBase
 
     //configure CAT
 	void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
-	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue);
+	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue, bool bully);
 	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it);
 	void divide_2_critical(uint64_t clos);
 	void divide_3_critical(uint64_t clos);
