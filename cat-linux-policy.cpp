@@ -1961,7 +1961,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			{
 				LOGINF("Task {} is a bully--> NON-CRITICAL and ISOLATE"_format(idTask));
 				excluded[idTask] = true;
-				if(n_isolated_apps < 3)
+				if(n_bully_apps < 2)
 					isolate_application(idTask, pidTask, itT);
 				else
 					LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
