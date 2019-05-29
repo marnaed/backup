@@ -1761,61 +1761,22 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					// update LLC occupancy
 					LLCoccup_critical[taskID] = l3_occup_mb;
 
-					// Check how it is doing
-					/*if (ipc_ICOV >= ipc_ICOV_threshold)
+					// check if critical app is having a bully behaviour
+					if (idle == false)
 					{
-						if ((ipc < 0.96*prev_ipc[taskID]) & (ipc < ipc_threshold))
+						if ((ipc < ipcLow) & (HPKIL3 > 10))
 						{
-							LOGINF("{}: ipc in new phase {} is worse than previous ({}) and less than {}!"_format(taskID,ipc,0.96*prev_ipc[taskID],ipc_threshold));
+							LOGINF("{}: ipc {} < {}, hpkil3 {}!!"_format(taskID,ipc,ipcLow,HPKIL3));
+							bully_counter[taskID]++;
+							LOGINF("{}: bully_counter++"_format(taskID));
 							ipc_phase_change[taskID] = true;
-						}
-						else if ((ipc < 0.96*prev_ipc[taskID]) & (ipc >= ipc_threshold))
-						{
-							LOGINF("{}: ipc in new phase {} is worse than previous ({}) but more than {}!"_format(taskID,ipc,0.96*prev_ipc[taskID],ipc_threshold));
-							ipc_phase_change[taskID] = false;
 						}
 						else
 						{
-							LOGINF("{}: ipc in new phase {} is better than previous ({})!"_format(taskID,ipc,0.96*prev_ipc[taskID]));
+							LOGINF("{}: ipc {} is OK !!"_format(taskID,ipc));
 							ipc_phase_change[taskID] = false;
 						}
 					}
-					else
-					{*/
-						if ((idle == false) & (ipc_phase_change[taskID] == false))
-						{
-							if (ipc < ipcLow)
-							{
-								if (HPKIL3 > 10)
-								{
-									LOGINF("{}: ipc {} < {}, hpkil3 {}!!"_format(taskID,ipc,ipcLow,HPKIL3));
-									bully_counter[taskID]++;
-									LOGINF("{}: bully_counter++"_format(taskID));
-									ipc_phase_change[taskID] = true;
-								}
-								//else
-								//	LOGINF("{}: ipc is lower than {}!!"_format(taskID,ipc_threshold));
-
-								//ipc_phase_change[taskID] = true;
-							}
-							else
-							{
-								LOGINF("{}: ipc {} is doing good !!"_format(taskID,ipc));
-								ipc_phase_change[taskID] = false;
-							}
-						}
-						else if ((idle == false) & (SUPERipc_phase_change[taskID] == true))
-						{
-							if ((ipc < ipcLow) & (HPKIL3 > 10))
-							{
-								LOGINF("{}: ipc {} < {}, hpkil3 {}!!"_format(taskID,ipc,ipcLow,HPKIL3));
-								ipc_phase_change[taskID] = true;
-								bully_counter[taskID]++;
-								LOGINF("{}: bully_counter++"_format(taskID));
-							}
-
-						}
-					//}
 				}
 			}
 
@@ -1980,7 +1941,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			{
 				LOGINF("Task {} is a bully--> NON-CRITICAL and ISOLATE"_format(idTask));
 				excluded[idTask] = true;
-				isolate_application(idTask, pidTask, itT);
+				if(n_isolated_apps < 3)
+					isolate_application(idTask, pidTask, itT);
+				else
+					LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
 			}
 
 			else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask > ipcMedium))
@@ -2202,20 +2166,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					}
 				}
 			}
-
-				/*auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&maxID](const auto& tuple) {return std::get<0>(tuple) == maxID;});
-				uint64_t CLOSvalue = std::get<1>(*it2);
-
-				auto y = std::min_element(LLCoccup_critical.begin(), LLCoccup_critical.end(),[](const std::pair<int, int>& p1, const std::pair<int, int>& p2) {return p1.second < p2.second; });
-				uint32_t minOcc = y->second;
-
-				LOGINF("[AA] minOccup: {}, maxOccup: {}"_format(minOcc,maxOcc));
-
-				if (maxOcc >= 2*minOcc)
-				{
-					divide_2_critical(CLOSvalue);
-					LOGINF("[AA] Critical apps ways divided!");
-				}*/
 
 			if(critical_apps>0 && critical_apps<4)
 			{
