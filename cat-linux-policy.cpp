@@ -1467,14 +1467,26 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 
 void CriticalAwareV3::isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it)
 {
+	uint64_t CLOS_isolated, mask_isolated;
 	// Isolate it in a separate CLOS with two exclusive ways
-	n_isolated_apps = n_isolated_apps + 1;
-	LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
-
-	auto closIT = free_closes.begin();
-	CLOS_isolated = *closIT;
-	mask_isolated = clos_mask[CLOS_isolated];
-	closIT = free_closes.erase(closIT);
+	if (bully_counter[taskID] >= 2)
+	{
+		n_bully_apps++;
+		LOGINF("[TEST] n_bully_apps = {}"_format(n_bully_apps));
+		auto closIT = bully_closes.begin();
+		CLOS_isolated = *closIT;
+		mask_isolated = clos_mask[CLOS_isolated];
+		closIT = bully_closes.erase(closIT);
+	}
+	else
+	{
+		n_isolated_apps++;
+		LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+		auto closIT = isolated_closes.begin();
+		CLOS_isolated = *closIT;
+		mask_isolated = clos_mask[CLOS_isolated];
+		closIT = isolated_closes.erase(closIT);
+	}
 
 	LinuxBase::get_cat()->add_task(CLOS_isolated,taskPID);
 	LOGINF("[TEST] {}: assigned to CLOS {}"_format(taskID,CLOS_isolated));
@@ -1485,27 +1497,35 @@ void CriticalAwareV3::isolate_application(uint32_t taskID, pid_t taskPID, std::v
 	it = taskIsInCRCLOS.erase(it);
 	taskIsInCRCLOS.push_back(std::make_pair(taskID,CLOS_isolated));
 	id_isolated.push_back(taskID);
-	CLOS_isolated = CLOS_isolated + 1;
-	//return it;
 
 }
 
-void CriticalAwareV3::include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue)
+void CriticalAwareV3::include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue, bool bully)
 {
 
-	free_closes.push_back(CLOSvalue);
-	LOGINF("[TEST] CLOS {} pushed back to free_closes"_format(CLOSvalue));
+	if (bully)
+	{
+		bully_closes.push_back(CLOSvalue);
+		LOGINF("[TEST] CLOS {} pushed back to bully_closes"_format(CLOSvalue));
+		n_bully_apps--;
+		LOGINF("[TEST] n_bully_apps = {}"_format(n_bully_apps));
+        id_bully.erase(std::remove(id_bully.begin(), id_bully.end(), taskID), id_bully.end());
+	}
+	else
+	{
+		isolated_closes.push_back(CLOSvalue);
+		LOGINF("[TEST] CLOS {} pushed back to isolated_closes"_format(CLOSvalue));
+		n_isolated_apps--;
+		LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+		id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+
+	}
+
 	LinuxBase::get_cat()->add_task(1,taskPID);
 	it = taskIsInCRCLOS.erase(it);
 	taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
-
 	excluded[taskID] = false;
-
 	LOGINF("[TEST] {}: return to CLOS 1"_format(taskID));
-	n_isolated_apps = n_isolated_apps - 1;
-	LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
-
-	id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
 }
 
 void CriticalAwareV3::divide_3_critical(uint64_t clos)
@@ -1727,10 +1747,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			if (current_interval >= firstInterval)
 			{
 				// Check if a bully app must be returned to CLOS 1
-				if ((((ipc_ICOV >= icov) & (HPKIL3 < 10)) | (ipc < 0.4)) & (CLOSvalue > 4) & (bully_counter[taskID] >= 2))
+				if ((((ipc_ICOV >= icov) & (HPKIL3 < 10)) | (ipc < 0.45)) & (CLOSvalue > 4) & (bully_counter[taskID] >= 2))
 				{
 					LOGINF("{}: bully task has changed IPC phase or ipc < 0.4 --> CLOS 1"_format(taskID));
-					include_application(taskID,taskPID,itT,CLOSvalue);
+					include_application(taskID,taskPID,itT,CLOSvalue,true);
 					bully_counter[taskID]--;
 
 				}
@@ -1739,7 +1759,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					if ((HPKIL3 >= 1) & (ipc_ICOV >= icov))
 					{
 						LOGINF("{}: isolated task has higher HPKIL3 or changed IPC phase --> CLOS 1"_format(taskID));
-						include_application(taskID,taskPID,itT,CLOSvalue);
+						include_application(taskID,taskPID,itT,CLOSvalue,false);
 					}
 				}
 				else if (CLOSvalue == 1)
