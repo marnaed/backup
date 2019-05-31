@@ -284,15 +284,11 @@ class CriticalAwareV3: public LinuxBase
 	std::vector<uint64_t> isolated_closes = {5, 6};
 	std::vector<uint64_t> bully_closes = {7, 8};
 	std::map<uint64_t, uint64_t> clos_mask = {
-          { 5, 0x00003 },
-          { 6, 0x0000c },
-          { 7, 0x000f0 },
-		  { 8, 0x00f00 },
+          { 5, 0x0000f },
+          { 6, 0x0000f },
+          { 7, 0x000ff },
+		  { 8, 0x000ff },
 	};
-	//{ 5, 0x00007 },
-   // { 6, 0x00038 },
-	//{ 7, 0x003c0 },
-	//{ 8, 0x03c00 },
 
 	std::vector<uint32_t> id_isolated;
 	std::vector<uint32_t> id_bully;
@@ -307,7 +303,7 @@ class CriticalAwareV3: public LinuxBase
 	std::map<uint32_t, uint64_t> ipc_phase_count;
 	std::map<uint32_t, uint64_t> limit_task;
     std::map<uint32_t, uint64_t> ipc_phase_duration;
-	std::map<uint32_t, uint64_t> bully_counter;
+	std::map<uint32_t, bool> bully;
 
     // dictionary holding sum of MPKIL3 of each application during a given phase
 	std::map<uint32_t, double> ipc_sumXij;
@@ -359,8 +355,8 @@ class CriticalAwareV3: public LinuxBase
 
     //configure CAT
 	void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
-	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue, bool bully);
-	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it);
+	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue, bool bullyB);
+	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, bool bullyB);
 	void divide_2_critical(uint64_t clos);
 	void divide_3_critical(uint64_t clos);
 	virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
