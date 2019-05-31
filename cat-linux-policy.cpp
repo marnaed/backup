@@ -1344,7 +1344,7 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 	if ((num_critical_new == 0) | (num_critical_new >= 4))
 	{
 
-		for (int clos = 1; clos <= 4; clos += 1)
+		for (int clos = 1; clos <= 8; clos += 1)
 			LinuxBase::get_cat()->set_cbm(clos,0xfffff);
 
 		for (const auto &item : v)
@@ -1356,14 +1356,26 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 			auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
             pid_t taskPID = std::get<1>(*it1);
 
+			auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
+
 			if ((CLOS >= 2) & (CLOS <= 4))
 			{
 				LinuxBase::get_cat()->add_task(1,taskPID);
 				CLOS_critical.insert(CLOS);
-				auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple)  == taskID;});
 				it2 = taskIsInCRCLOS.erase(it2);
 				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
 			}
+			else if ((CLOS >= 5) & (CLOS <= 6))
+			{
+				LOGINF("[UPDATE] Include isolated task {} to CLOS 1"_format(taskID));
+				include_application(taskID,taskPID,it2,CLOS,false);
+			}
+			else if ((CLOS >= 7) & (CLOS <= 8))
+			{
+				LOGINF("[UPDATE] Include bully task {} to CLOS 1"_format(taskID));
+				include_application(taskID,taskPID,it2,CLOS,true);
+			}
+
 		}
 
 		num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
@@ -1848,7 +1860,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			SUPERipc_phase_change[taskID] = false;
 			excluded[taskID]= false;
 			bully[taskID] = false;
-			LOGINF("[YY] {}: ipc phase change = {}"_format(taskID,ipc_phase_change[taskID]));
         }
 
 	}
