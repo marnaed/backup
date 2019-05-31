@@ -1410,7 +1410,7 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 				// cr_val will be 0 for the new non-critical apps
             	LinuxBase::get_cat()->add_task(1,taskPID);
 				new_clos = 1;
-				ipc_phase_change[taskID] = false;
+				//ipc_phase_change[taskID] = false;
 				uint32_t clos = std::get<1>(*it2);
 				CLOS_critical.insert(clos);
 				LLCoccup_critical.erase(taskID);
@@ -1768,6 +1768,11 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						LOGINF("{}: bully task has changed IPC phase --> CLOS 1"_format(taskID));
 						include_application(taskID,taskPID,itT,CLOSvalue,true);
 					}
+					else if (ipc < 0.45)
+					{
+						LOGINF("{}: bully task ipc < 0.45 --> CLOS 1"_format(taskID));
+						include_application(taskID,taskPID,itT,CLOSvalue,true);
+					}
 					/*else if (ipc < 0.45)
 					{
 						LOGINF("{}: bully task ipc < 0.45 --> CLOS 1"_format(taskID));
@@ -1810,9 +1815,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					{
 						if ((ipc < ipcLow) & (HPKIL3 > 10))
 						{
-							LOGINF("{}: ipc {} < {}, hpkil3 {}!!"_format(taskID,ipc,ipcLow,HPKIL3));
-							//bully_counter[taskID]++;
-							//LOGINF("{}: bully_counter++"_format(taskID));
+							LOGINF("{}: ipc {} < {} and HPKIL3 {} > 10!!"_format(taskID,ipc,ipcLow,HPKIL3));
 							ipc_phase_change[taskID] = true;
 							SUPERipc_phase_change[taskID] = true;
 						}
@@ -1845,6 +1848,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			SUPERipc_phase_change[taskID] = false;
 			excluded[taskID]= false;
 			bully[taskID] = false;
+			LOGINF("[YY] {}: ipc phase change = {}"_format(taskID,ipc_phase_change[taskID]));
         }
 
 	}
@@ -1911,7 +1915,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	}
 
 	uint64_t size;
-	double q3, limit_outlier, limit_houtlier;
+	double q3, limit_outlier;
 
 	/** Calculate limit outlier using 3std **/
 	//mean = acc::mean(macc);
@@ -1953,9 +1957,11 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&idTask](const auto& tuple){return std::get<0>(tuple)  == idTask;});
         pid_t pidTask = std::get<1>(*it1);
 
+		//LOGINF("[YY] {}: ipc phase change = {}"_format(idTask,ipc_phase_change[idTask]));
+
 		if ((CLOSvalue >= 2) & (CLOSvalue <= 4) & (SUPERipc_phase_change[idTask] == false))
 		{
-		if (ipc_phase_change[idTask] == false)
+			if (ipc_phase_change[idTask] == false)
 			{
 				LOGINF("The critical task {} has not changed phase and is doing good--> CRITICAL"_format(idTask));
 				outlier.push_back(std::make_pair(idTask,1));
@@ -1965,6 +1971,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			{
 				LOGINF("The critical task {} is not making a profitable use of LLC space --> NON CRITICAL"_format(idTask));
 				outlier.push_back(std::make_pair(idTask,0));
+				ipc_phase_change[idTask] = false;
 				//useless_counter[idTask]++;
 				//if (useless_counter[idTask] == 2)
 				//	LOGINF("Task {} will be no longer critical until it changes phase!"_format(idTask));
@@ -1973,6 +1980,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		else if((CLOSvalue < 7) & (MPKIL3Task >= 4) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow) & (bully[idTask] == false))
 		{
 			excluded[idTask] = true;
+			change_in_outliers = true;
 			outlier.push_back(std::make_pair(idTask,0));
 			if ((CLOSvalue <= 4) & (CLOSvalue >=2))
 			{
@@ -1990,7 +1998,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		}
         else if ((MPKIL3Task >= limit_outlier) & (itX == id_isolated.end()) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium) & (bully[idTask] == false))
         {
-			LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,limit_houtlier));
+			LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(idTask,MPKIL3Task,limit_outlier,HPKIL3Task,hpkil3Limit));
 			outlier.push_back(std::make_pair(idTask,1));
 			critical_apps = critical_apps + 1;
 			if (excluded[idTask] == true)
@@ -2018,7 +2026,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 		prev_ipc[idTask] = IPCTask;
 		SUPERipc_phase_change[idTask] = false;
-		ipc_phase_change[idTask] = false;
+		//ipc_phase_change[idTask] = false;
 
 
     }
