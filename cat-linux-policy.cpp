@@ -1825,6 +1825,11 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					// check if critical app is having a bully behaviour
 					if (idle == false)
 					{
+						if ((SUPERipc_phase_change[taskID] == true) & (HPKIL3 > 1) & (MPKIL3 < 1))
+						{
+							LOGINF("{}: IPC Phase change but HPKIL3 is {} and MPKIL3 is {} --> CRITICAL"_format(taskID,HPKIL3,MPKIL3));
+							SUPERipc_phase_change[taskID] = false;
+						}
 						if ((ipc < ipcLow) & (HPKIL3 > 10))
 						{
 							LOGINF("{}: ipc {} < {} and HPKIL3 {} > 10!!"_format(taskID,ipc,ipcLow,HPKIL3));
@@ -2221,26 +2226,34 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				for ( const auto &myPair : LLCoccup_critical )
 				{
 					double occup = myPair.second;
+					idTask = myPair.first;
 					LOGINF("[AA] {}: occup {}"_format(myPair.first,occup));
 
 					if((maxOcc >= 2*occup) & (maxID != myPair.first) & (limit == false))
 					{
 						auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&maxID](const auto& tuple) {return std::get<0>(tuple) == maxID;});
 						uint64_t CLOSvalue = std::get<1>(*it2);
-						LOGINF("[AA] Limit space to CLOS {}"_format(CLOSvalue));
-						//if ((critical_apps == 2) | ((critical_apps == 3) & (limit == true) & (limit_task[maxID] == false)))
-						//{
-						divide_2_critical(CLOSvalue);
-						limit_task[maxID] = true;
-						limit = true;
-						//}
-						//else if (critical_apps == 3)
-						//{
-						//	divide_3_critical(CLOSvalue);
-						//	limit_task[maxID] = true;
-						//}
-						LOGINF("[AA] Critical apps ways divided!");
+
+						auto it = std::find_if(v_ipc.begin(), v_ipc.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
+						double ipcTask = std::get<1>(*it);
+
+						if (ipcTask < ipcMedium)
+						{
+							LOGINF("[AA] Limit space to CLOS {}"_format(CLOSvalue));
+							//if ((critical_apps == 2) | ((critical_apps == 3) & (limit == true) & (limit_task[maxID] == false)))
+							//{
+							divide_2_critical(CLOSvalue);
+							limit_task[maxID] = true;
+							limit = true;
+							//}
+							//else if (critical_apps == 3)
+							//{
+							//	divide_3_critical(CLOSvalue);
+							//	limit_task[maxID] = true;
+							//}
+							LOGINF("[AA] Critical apps ways divided!");
 						break;
+						}
 					}
 				}
 			}
