@@ -1364,6 +1364,9 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 				CLOS_critical.insert(CLOS);
 				it2 = taskIsInCRCLOS.erase(it2);
 				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+				LLCoccup_critical.erase(taskID);
+				limit_task[taskID] = false;
+				limit = false;
 			}
 			else if ((CLOS >= 5) & (CLOS <= 6))
 			{
@@ -1426,6 +1429,8 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 				uint32_t clos = std::get<1>(*it2);
 				CLOS_critical.insert(clos);
 				LLCoccup_critical.erase(taskID);
+				limit_task[taskID] = false;
+                limit = false;
 			}
 
 			//update taskIsInCRCLOS
@@ -1545,33 +1550,63 @@ void CriticalAwareV3::include_application(uint32_t taskID, pid_t taskPID, std::v
 	LOGINF("[TEST] {}: return to CLOS 1"_format(taskID));
 }
 
-void CriticalAwareV3::divide_3_critical(uint64_t clos)
+void CriticalAwareV3::divide_3_critical(uint64_t clos, bool limitDone)
 {
 	uint64_t maxWays = std::max(num_ways_CLOS_2,num_ways_CLOS_3);
 	maxWays = std::max(maxWays,num_ways_CLOS_4);
 
-	switch (maxWays)
+	if (!limitDone)
 	{
-		case 20: case 19:
-			LinuxBase::get_cat()->set_cbm(clos,0xfe000);
-			break;
-		case 18: case 17: case 16:
-			LinuxBase::get_cat()->set_cbm(clos,0xfc000);
-			break;
-		case 15: case 14: case 13:
-			LinuxBase::get_cat()->set_cbm(clos,0xf8000);
-			break;
-		case 12: case 11: case 10:
-			LinuxBase::get_cat()->set_cbm(clos,0xf0000);
-			break;
-		case 9: case 8: case 7:
-			LinuxBase::get_cat()->set_cbm(clos,0xe0000);
-			break;
-		case 6: case 5: case 4:
-			LinuxBase::get_cat()->set_cbm(clos,0xc0000);
-			break;
-		default:
-			break;
+		switch (maxWays)
+		{
+			case 20: case 19:
+				LinuxBase::get_cat()->set_cbm(clos,0xfe000);
+				break;
+			case 18: case 17: case 16:
+				LinuxBase::get_cat()->set_cbm(clos,0xfc000);
+				break;
+			case 15: case 14: case 13:
+				LinuxBase::get_cat()->set_cbm(clos,0xf8000);
+				break;
+			case 12: case 11: case 10:
+				LinuxBase::get_cat()->set_cbm(clos,0xf0000);
+				break;
+			case 9: case 8: case 7:
+				LinuxBase::get_cat()->set_cbm(clos,0xe0000);
+				break;
+			case 6: case 5: case 4:
+				LinuxBase::get_cat()->set_cbm(clos,0xc0000);
+				break;
+			default:
+				break;
+		}
+	}
+	else
+	{
+		switch (maxWays)
+		{
+			case 20: case 19:
+				LinuxBase::get_cat()->set_cbm(clos,0xfffc0);
+				break;
+			case 18: case 17: case 16:
+				LinuxBase::get_cat()->set_cbm(clos,0xfff00);
+				break;
+			case 15: case 14: case 13:
+				LinuxBase::get_cat()->set_cbm(clos,0xffc00);
+				break;
+			case 12: case 11: case 10:
+				LinuxBase::get_cat()->set_cbm(clos,0xff000);
+				break;
+			case 9: case 8: case 7:
+				LinuxBase::get_cat()->set_cbm(clos,0xfc000);
+				break;
+			case 6:
+				LinuxBase::get_cat()->set_cbm(clos,0xf0000);
+				break;
+			default:
+				break;
+		}
+
 	}
 
 	if (clos == 2)
@@ -1759,15 +1794,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					SUPERipc_phase_change[taskID] = true;
 					LOGINF("{}: SUPER IPC PHASE CHANGE!!"_format(taskID));
 				}
-				/*if ((CLOSvalue == 1) & (bully[taskID] == true))
-				{
-					LOGINF("{}: no longer a bully"_format(taskID));
-					excluded[taskID] = false;
-					bully[taskID] = false;
-			       	n_bully_apps--;
-                    LOGINF("[TEST] n_bully_apps = {}"_format(n_bully_apps));
-					id_bully.erase(std::remove(id_bully.begin(), id_bully.end(), taskID), id_bully.end());
-				}*/
 			}
 
 			if (current_interval >= firstInterval)
@@ -1776,24 +1802,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				if (CLOSvalue >= 7)
 				{
 					if ((ipc_ICOV >= icov) & (HPKIL3 < 10))
-					{
 						LOGINF("{}: bully task has changed IPC phase --> CLOS 1"_format(taskID));
-						include_application(taskID,taskPID,itT,CLOSvalue,true);
-					}
 					else if (ipc < 0.45)
-					{
 						LOGINF("{}: bully task ipc < 0.45 --> CLOS 1"_format(taskID));
-						include_application(taskID,taskPID,itT,CLOSvalue,true);
-					}
-					/*else if (ipc < 0.45)
-					{
-						LOGINF("{}: bully task ipc < 0.45 --> CLOS 1"_format(taskID));
-						bully_closes.insert(bully_closes.begin(),CLOSvalue);
-						LOGINF("[TEST] CLOS {} pushed back to bully_closes"_format(CLOSvalue));
-						LinuxBase::get_cat()->add_task(1,taskPID);
-      					itT = taskIsInCRCLOS.erase(itT);
-     	 				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
-					}*/
+					include_application(taskID,taskPID,itT,CLOSvalue,true);
 				}
 				else if ((CLOSvalue > 4) & (bully[taskID] == false))
 				{ // ISOLATED APP
@@ -1973,8 +1985,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&idTask](const auto& tuple){return std::get<0>(tuple)  == idTask;});
         pid_t pidTask = std::get<1>(*it1);
 
-		//LOGINF("[YY] {}: ipc phase change = {}"_format(idTask,ipc_phase_change[idTask]));
-
 		if ((CLOSvalue >= 2) & (CLOSvalue <= 4) & (SUPERipc_phase_change[idTask] == false))
 		{
 			if (ipc_phase_change[idTask] == false)
@@ -1988,9 +1998,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				LOGINF("The critical task {} is not making a profitable use of LLC space --> NON CRITICAL"_format(idTask));
 				outlier.push_back(std::make_pair(idTask,0));
 				ipc_phase_change[idTask] = false;
-				//useless_counter[idTask]++;
-				//if (useless_counter[idTask] == 2)
-				//	LOGINF("Task {} will be no longer critical until it changes phase!"_format(idTask));
 			}
 		}
 		else if((CLOSvalue < 7) & (MPKIL3Task >= 4) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow) & (bully[idTask] == false))
@@ -2042,9 +2049,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 		prev_ipc[idTask] = IPCTask;
 		SUPERipc_phase_change[idTask] = false;
-		//ipc_phase_change[idTask] = false;
-
-
     }
 
 	LOGINF("critical_apps = {}"_format(critical_apps));
@@ -2214,8 +2218,8 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
             update_configuration(taskIsInCRCLOS, status, prev_critical_apps, critical_apps);
 		else
 		{
-			//if ((critical_apps == 2) | (critical_apps == 3))
-			if (critical_apps == 2)
+			if ((critical_apps == 2) | (critical_apps == 3))
+			//if (critical_apps == 2)
 			{
 				// Check occupancy of critical apps
 				auto x = std::max_element(LLCoccup_critical.begin(), LLCoccup_critical.end(),[](const std::pair<int, int>& p1, const std::pair<int, int>& p2) {return p1.second < p2.second; });
@@ -2229,7 +2233,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					idTask = myPair.first;
 					LOGINF("[AA] {}: occup {}"_format(myPair.first,occup));
 
-					if((maxOcc >= 2*occup) & (maxID != myPair.first) & (limit == false))
+					if((maxOcc >= 2*occup) & (maxID != myPair.first))
 					{
 						auto it2 = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&maxID](const auto& tuple) {return std::get<0>(tuple) == maxID;});
 						uint64_t CLOSvalue = std::get<1>(*it2);
@@ -2237,22 +2241,23 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						auto it = std::find_if(v_ipc.begin(), v_ipc.end(),[&idTask](const auto& tuple) {return std::get<0>(tuple) == idTask;});
 						double ipcTask = std::get<1>(*it);
 
-						if (ipcTask < ipcMedium)
+						it = std::find_if(v_ipc.begin(), v_ipc.end(),[&maxID](const auto& tuple) {return std::get<0>(tuple) == maxID;});
+						double maxIPC = std::get<1>(*it);
+
+						if ((ipcTask < ipcMedium) & (maxIPC > ipcMedium))
 						{
 							LOGINF("[AA] Limit space to CLOS {}"_format(CLOSvalue));
-							//if ((critical_apps == 2) | ((critical_apps == 3) & (limit == true) & (limit_task[maxID] == false)))
-							//{
-							divide_2_critical(CLOSvalue);
+							if ((critical_apps == 2) & (limit == false))
+								divide_2_critical(CLOSvalue);
+							else if ((critical_apps == 3) & (limit == true) & (limit_task[maxID] == false))
+								divide_2_critical(CLOSvalue); //2/3
+							else if ((critical_apps == 3) & (limit == false) & (limit_task[maxID] == false))
+								divide_3_critical(CLOSvalue, false); //1/3
+
 							limit_task[maxID] = true;
 							limit = true;
-							//}
-							//else if (critical_apps == 3)
-							//{
-							//	divide_3_critical(CLOSvalue);
-							//	limit_task[maxID] = true;
-							//}
 							LOGINF("[AA] Critical apps ways divided!");
-						break;
+							break;
 						}
 					}
 				}

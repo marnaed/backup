@@ -358,7 +358,7 @@ class CriticalAwareV3: public LinuxBase
 	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue, bool bullyB);
 	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, bool bullyB);
 	void divide_2_critical(uint64_t clos);
-	void divide_3_critical(uint64_t clos);
+	void divide_3_critical(uint64_t clos, bool limitDone);
 	virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
 
 };
