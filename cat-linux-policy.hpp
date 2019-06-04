@@ -292,6 +292,7 @@ class CriticalAwareV3: public LinuxBase
 
 	std::vector<uint32_t> id_isolated;
 	std::vector<uint32_t> id_bully;
+	std::vector<uint32_t> id_phase_change;
 
 	std::map<uint64_t,double> LLCoccup_critical;
 	std::set<uint32_t> CLOS_critical = {2, 3, 4};
@@ -314,9 +315,9 @@ class CriticalAwareV3: public LinuxBase
 	// In order for next interval to not contaminate
 	// set of MPKIL3 values
 	std::map<uint64_t, bool> excluded;
-	std::map<uint64_t, bool> ipc_phase_change;
-	std::map<uint64_t, bool> SUPERipc_phase_change;
-	std::map<uint64_t, bool> ipc_icov;
+	//std::map<uint64_t, bool> ipc_phase_change;
+	//std::map<uint64_t, bool> SUPERipc_phase_change;
+	//std::map<uint64_t, bool> ipc_icov;
 
 	bool limit = false;
 
