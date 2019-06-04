@@ -1942,19 +1942,17 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			LOGINF("Task {} is excluded!!!"_format(idTask));
 	}
 
-	uint64_t size;
-	double q3, limit_outlier;
-
 	/** Calculate limit outlier using 3std **/
-	//mean = acc::mean(macc);
-	//var = acc::variance(macc);
-	size = all_mpkil3.size();
-	q3 = *std::next(all_mpkil3.begin(), size*0.75);
+	//double mean = acc::mean(macc);
+	//double var = acc::variance(macc);
+	double size = all_mpkil3.size();
+	double q3 = *std::next(all_mpkil3.begin(), size*0.75);
 	//double limit_outlier = mean + 1.5*std::sqrt(var);
 	//LOGINF("MPKIL3 1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
-	if (q3 > 1)
-		limit_outlier = q3;
-	else
+	//if (limit_outlier < 1)
+	//	limit_outlier = 1;
+	double limit_outlier = q3;
+	if (limit_outlier < 1)
 		limit_outlier = 1;
 	LOGINF("MPKIL3 LIMIT OUTLIER = {}"_format(limit_outlier));
 	LOGINF("HPKIL3 LIMIT OUTLIER = {}"_format(hpkil3Limit));
