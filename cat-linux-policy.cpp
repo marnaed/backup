@@ -1699,6 +1699,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
     auto v_hpkil3 = std::vector<pairD_t>();
 	auto v_ipc = std::vector<pairD_t>();
 	auto v_l3_occup_mb = std::vector<pairD_t>();
+	auto id_phase_change =  std::vector<uint32_t>();
 
 	// Set holding all MPKI-L3 values from a given interval
 	// used to compute the value of limit_outlier
@@ -1777,6 +1778,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 			LOGINF("{}: CLOS {}"_format(taskID,CLOSvalue));
 
+			if ((CLOSvalue >= 2) & (CLOSvalue <= 4))
+				LLCoccup_critical[taskID]= l3_occup_mb;
+
+
 			ipc_sumXij[taskID] += ipc;
             ipc_phase_duration[taskID] += 1;
 
@@ -1793,8 +1798,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				ipc_sumXij[taskID] = ipc;
 				id_phase_change.push_back(taskID);
 			}
-
-			if (current_interval == firstInterval)
+			else if (current_interval == firstInterval)
 				id_phase_change.push_back(taskID);
 
 			// Add to valid_mpkil3 queue
@@ -1855,21 +1859,21 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			LOGINF("Task {} is excluded!!!"_format(taskID));
 	}
 	/** Calculate limit outlier using 3std **/
-	//double mean = acc::mean(macc);
-	//double var = acc::variance(macc);
-	double size = all_mpkil3.size();
-	double q3 = *std::next(all_mpkil3.begin(), size*0.75);
-	//double limit_outlier = mean + 1.5*std::sqrt(var);
-	//LOGINF("MPKIL3 1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
-	//if (limit_outlier < 1)
-	//	limit_outlier = 1;
-	double limit_outlier = q3;
+	double mean = acc::mean(macc);
+	double var = acc::variance(macc);
+	//double size = all_mpkil3.size();
+	//double q3 = *std::next(all_mpkil3.begin(), size*0.75);
+	double limit_outlier = mean + 1.5*std::sqrt(var);
+	LOGINF("MPKIL3 1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
 	if (limit_outlier < 1)
 		limit_outlier = 1;
+	//double limit_outlier = q3;
+	//if (limit_outlier < 1)
+	//	limit_outlier = 1;
 	LOGINF("MPKIL3 LIMIT OUTLIER = {}"_format(limit_outlier));
 	LOGINF("HPKIL3 LIMIT OUTLIER = {}"_format(hpkil3Limit));
 
-	critical_apps = 0;
+	//critical_apps = 0;
 	for (auto const &x : id_phase_change)
 	{
 		taskID = x;
@@ -1941,11 +1945,12 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					LOGINF("Critical task {} is profitable so continue critical"_format(taskID));
 					outlier.push_back(std::make_pair(taskID,1));
-					critical_apps++;
+					//critical_apps++;
 				}
 				else if((MPKIL3Task >= 4) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow)) // 2. Check if it is problematic
 				{
 					excluded[taskID] = true;
+					critical_apps--;
 					change_in_outliers = true;
 					outlier.push_back(std::make_pair(taskID,0));
 					LOGINF("Task {} is a bully--> NON-CRITICAL and ISOLATE"_format(taskID));
@@ -1960,13 +1965,16 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					LOGINF("Task {} is still critical!"_format(taskID));
 					outlier.push_back(std::make_pair(taskID,1));
-					critical_apps++;
+					//critical_apps++;
 				}
 				else
 				{
 					LOGINF("Task {} is now non-critical!"_format(taskID));
 					outlier.push_back(std::make_pair(taskID,0));
 					change_in_outliers = true;
+					LLCoccup_critical.erase(taskID);
+                    CLOS_critical.insert(CLOSvalue);
+					critical_apps--;
 				}
 				break;
 
@@ -2010,6 +2018,28 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	}
 
 	LOGINF("critical_apps = {}"_format(critical_apps));
+
+	for (auto const &x : taskIsInCRCLOS)
+	{
+		taskID = std::get<0>(x);
+		uint64_t CLOSvalue = std::get<1>(x);
+		auto it1 = std::find_if(outlier.begin(), outlier.end(),[&taskID](const auto& tuple){return std::get<0>(tuple)  == taskID;});
+
+		if (it1 == outlier.end())
+		{
+			switch (CLOSvalue)
+			{
+				case 2: case 3: case 4:
+					outlier.push_back(std::make_pair(taskID,1));
+					break;
+				case 1: case 5: case 6: case 7: case 8:
+					outlier.push_back(std::make_pair(taskID,0));
+					break;
+			}
+		}
+
+	}
+
 
     //check CLOS are configured to the correct mask
     if (firstTime)
@@ -2221,7 +2251,18 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 			}
 
-			if(critical_apps>0 && critical_apps<4)
+			if (idle == true)
+			{
+				LOGINF("IDLE INTERVAL {}"_format(idle_count));
+        		idle_count = idle_count - 1;
+        		if(idle_count == 0)
+        		{
+        			idle = false;
+            		idle_count = idleIntervals;
+        		}
+
+			}
+			else if((critical_apps > 0) & (critical_apps < 4))
 			{
 				// if there is no new critical app, modify mask if not done previously
 				LOGINF("IPC total = {}"_format(ipcTotal));
@@ -2316,7 +2357,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					}
 				}
 
-				//idle = true;
+				idle = true;
 
 				num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
 				num_ways_CLOS_2 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(2));

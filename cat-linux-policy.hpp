@@ -292,7 +292,7 @@ class CriticalAwareV3: public LinuxBase
 
 	std::vector<uint32_t> id_isolated;
 	std::vector<uint32_t> id_bully;
-	std::vector<uint32_t> id_phase_change;
+	//std::vector<uint32_t> id_phase_change;
 
 	std::map<uint64_t,double> LLCoccup_critical;
 	std::set<uint32_t> CLOS_critical = {2, 3, 4};
