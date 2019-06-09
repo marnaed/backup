@@ -1927,14 +1927,14 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < hpkil3Limit)) // 3. Check if it is misuser
 				{
-					LOGINF("The MPKI_L3 of task {} is an outlier but HPKIL3 is very low {}!!"_format(taskID,MPKIL3Task,HPKIL3Task));
+					LOGINF("The MPKI_L3 of task {} is an outlier but HPKIL3 is very low {}!!"_format(taskID,HPKIL3Task));
 					if(n_isolated_apps < 2)
 						isolate_application(taskID,taskPID,itT,false);
 					else
 						 LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
 					outlier.push_back(std::make_pair(taskID,0));
 				}
-				else if ((l3_occup_mb > limit_space) & (HPKIL3Task < 1) & (MPKIL3Task < 1)) // 4. Check if it is isolated
+				else if ((l3_occup_mb > limit_space) & (HPKIL3Task < 0.5) & (MPKIL3Task < 0.5)) // 4. Check if it is isolated
 				{
 					LOGINF("[TEST] {}: has l3_occup_mb {} -> isolate!"_format(taskID,l3_occup_mb));
 					if(n_isolated_apps < 2)
@@ -1972,7 +1972,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					else
 						LOGINF("There are no isolated CLOSes available --> CLOS 1");
 				}
-				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 3. Check if it is still critical
+				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit)) // 3. Check if it is still critical
 				{
 					LOGINF("Task {} is still critical!"_format(taskID));
 					outlier.push_back(std::make_pair(taskID,1));
@@ -1980,7 +1980,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < hpkil3Limit)) // 4. Check if it is misuser
 				{
-					LOGINF("The MPKI_L3 of task {} is an outlier but HPKIL3 is very low {}!!"_format(taskID,MPKIL3Task,HPKIL3Task));
+					LOGINF("The MPKI_L3 of task {} is an outlier but HPKIL3 is very low {}!!"_format(taskID,HPKIL3Task));
 					if(n_isolated_apps < 2)
 						isolate_application(taskID,taskPID,itT,false);
 					else
@@ -2001,7 +2001,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 			case 5: case 6: // Isolated
 				// 1. Check if it is non-critical
-				if (HPKIL3Task >= 1)
+				if ((HPKIL3Task > 0.5) & (MPKIL3Task > 0.5))
 				{
 					LOGINF("{}: isolated task has HPKIL3 {} >= 1 --> CLOS 1"_format(taskID, HPKIL3Task));
 					include_application(taskID,taskPID,itT,CLOSvalue,false);
@@ -2268,6 +2268,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 							LOGINF("[AA] Critical apps ways divided!");
 							break;
 						}
+						else
+						{
+							LOGINF("[AA] IPCtask ({}) {} and maxIPC ({}) {} do not fullfil criteria to limit!"_format(taskID, ipcTask, maxID, maxIPC));
+						}
 					}
 				}
 			}
@@ -2338,12 +2342,23 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					}
 
 					// State actions switch-case
+					uint64_t max = 0;
+					uint64_t noncritical_apps = 8 - critical_apps;
+					uint64_t limit_critical = 22 - noncritical_apps;
+
+
 					switch (state)
 					{
 						case 5:
 							LOGINF("NCR-- (Remove one shared way from CLOS with non-critical apps)");
-							maskNonCrCLOS = (maskNonCrCLOS >> 1) | 0x00001;
-							LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
+							if (num_ways_CLOS_1 > noncritical_apps)
+							{
+								maskNonCrCLOS = (maskNonCrCLOS >> 1) | 0x00001;
+								LinuxBase::get_cat()->set_cbm(1,maskNonCrCLOS);
+							}
+							else
+								LOGINF("Non-critical apps. have reached limit space.");
+
 							break;
 
 						case 6:
@@ -2364,12 +2379,29 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 						case 8:
 							LOGINF("CR++ (Add one shared way to CLOS with critical apps)");
-							maskCLOS2 = (maskCLOS2 >> 1) | 0x80000;
-							maskCLOS3 = (maskCLOS3 >> 1) | 0x80000;
-							maskCLOS4 = (maskCLOS4 >> 1) | 0x80000;
-							LinuxBase::get_cat()->set_cbm(2,maskCLOS2);
-							LinuxBase::get_cat()->set_cbm(3,maskCLOS3);
-							LinuxBase::get_cat()->set_cbm(4,maskCLOS4);
+							if (critical_apps == 1)
+								max = num_ways_CLOS_2;
+							else if (critical_apps == 2)
+								max = std::max(num_ways_CLOS_2, num_ways_CLOS_3);
+							else if (critical_apps == 3)
+							{
+								max = std::max(num_ways_CLOS_2, num_ways_CLOS_3);
+								max = std::max(max, num_ways_CLOS_4);
+							}
+
+							LOGINF("MAX = {}, limit_critical = {}"_format(max, limit_critical));
+
+							if (max < limit_critical)
+							{
+								maskCLOS2 = (maskCLOS2 >> 1) | 0x80000;
+								maskCLOS3 = (maskCLOS3 >> 1) | 0x80000;
+								maskCLOS4 = (maskCLOS4 >> 1) | 0x80000;
+								LinuxBase::get_cat()->set_cbm(2,maskCLOS2);
+								LinuxBase::get_cat()->set_cbm(3,maskCLOS3);
+								LinuxBase::get_cat()->set_cbm(4,maskCLOS4);
+							}
+							else
+								LOGINF("Critical app(s). have reached limit space.");
 							break;
 
 						default:
