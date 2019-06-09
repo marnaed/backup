@@ -1797,6 +1797,48 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				ipc_phase_duration[taskID] = 1;
 				ipc_sumXij[taskID] = ipc;
 				id_phase_change.push_back(taskID);
+
+				if ((limit_task[taskID] == true) & (ipc < ipcMedium) & (CLOSvalue >= 2) & (CLOSvalue <= 4))
+				{
+					LOGINF("[AA] Limiting task {} was not good! -> return its ways"_format(taskID));
+					uint64_t mask = 0;
+
+					switch (CLOSvalue)
+					{
+						case 2:
+							if (critical_apps == 2)
+								mask = LinuxBase::get_cat()->get_cbm(3);
+							else if(num_ways_CLOS_3 > 10)
+								mask = LinuxBase::get_cat()->get_cbm(3);
+							else
+								mask = LinuxBase::get_cat()->get_cbm(4);
+							maskCLOS2 = mask;
+							LinuxBase::get_cat()->set_cbm(CLOSvalue,mask);
+							num_ways_CLOS_2 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(2));
+							break;
+						case 3:
+							if (critical_apps == 2)
+								mask = LinuxBase::get_cat()->get_cbm(2);
+							else if(num_ways_CLOS_2 > 10)
+								mask = LinuxBase::get_cat()->get_cbm(2);
+							else
+								mask = LinuxBase::get_cat()->get_cbm(4);
+							maskCLOS3 = mask;
+							LinuxBase::get_cat()->set_cbm(CLOSvalue,mask);
+							num_ways_CLOS_3 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(3));
+							break;
+						case 4:
+							if (num_ways_CLOS_2 > 10)
+								mask = LinuxBase::get_cat()->get_cbm(2);
+							else
+								mask = LinuxBase::get_cat()->get_cbm(3);
+							maskCLOS4 = mask;
+							LinuxBase::get_cat()->set_cbm(CLOSvalue,mask);
+							num_ways_CLOS_4 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(4));
+							break;
+					}
+
+				}
 			}
 			else if (current_interval == firstInterval)
 				id_phase_change.push_back(taskID);
