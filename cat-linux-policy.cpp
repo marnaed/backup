@@ -1786,11 +1786,11 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			{
 				LLCoccup_critical[taskID]= l3_occup_mb;
 				// Check app is not wasting time
-				if ((ipc < ipcLow) & (ipc_phase_duration[taskID] > 10))
+				/*if ((ipc < ipcLow) & (ipc_phase_duration[taskID] > 10))
 				{
 					id_phase_change.push_back(taskID);
 					LOGINF("{}: too many intervals critical and with low IPC --> CHECK!"_format(taskID));
-				}
+				}*/
 			}
 
 			/**** IPC ICOV ****/
@@ -2073,6 +2073,24 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					include_application(taskID,taskPID,itT,CLOSvalue,false);
 					outlier.push_back(std::make_pair(taskID,0));
 				}
+				else if((MPKIL3Task >= 4) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow)) // 1. Check if it is a bully
+				{
+					excluded[taskID] = true;
+					outlier.push_back(std::make_pair(taskID,0));
+					LOGINF("Task {} is a bully--> NON-CRITICAL and ISOLATE"_format(taskID));
+					if(n_bully_apps < 2)
+						isolate_application(taskID, taskPID, itT, true);
+					else
+						LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
+				}
+				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. Check if it is critical
+        		{
+					LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(taskID,MPKIL3Task,limit_outlier,HPKIL3Task,hpkil3Limit));
+					outlier.push_back(std::make_pair(taskID,1));
+					critical_apps++;
+					change_in_outliers = true;
+				}
+
 				else
 				{
 					LOGINF("Task {} is still isolated!"_format(taskID));
