@@ -2064,7 +2064,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					include_application(taskID,taskPID,itT,CLOSvalue,true);
 					outlier.push_back(std::make_pair(taskID,0));
 				}
-				if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. Check if it is critical
+				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. Check if it is critical
         		{
 					LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(taskID,MPKIL3Task,limit_outlier,HPKIL3Task,hpkil3Limit));
 					outlier.push_back(std::make_pair(taskID,1));
@@ -2182,45 +2182,45 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			}
         	firstTime = 0;
 			idle = true;
-		}
 
-		//assign each core to its corresponding CLOS
-        for (const auto &item : outlier)
-        {
-            taskID = std::get<0>(item);
-            uint32_t outlierValue = std::get<1>(item);
-			auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple){return std::get<0>(tuple)  == taskID;});
-			taskPID = std::get<1>(*it1);
-			auto it = std::find_if(v_ipc.begin(), v_ipc.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
-			double ipcTask = std::get<1>(*it);
-			// Find CLOS value
-			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
-        	uint64_t CLOSvalue = std::get<1>(*itT);
-
-			auto itC = CLOS_critical.begin();
-
-            if(outlierValue)
-            {
-				limit_task[taskID] = false;
-                LinuxBase::get_cat()->add_task(*itC,taskPID);
-				LOGINF("Task ID {} assigned to CLOS {}"_format(taskID,*itC));
-        		itT = taskIsInCRCLOS.erase(itT);
-                taskIsInCRCLOS.push_back(std::make_pair(taskID,*itC));
-				itC = CLOS_critical.erase(itC);
-                ipc_CR += ipcTask;
-            }
-            else if (CLOSvalue < 5)
-            {
-				LinuxBase::get_cat()->add_task(1,taskPID);
-				LOGINF("Task ID {} assigned to CLOS 1"_format(taskID));
-				itT = taskIsInCRCLOS.erase(itT);
-				taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
-                ipc_NCR += ipcTask;
-            }
-			else if (CLOSvalue >= 5)
+			//assign each core to its corresponding CLOS
+			for (const auto &item : outlier)
 			{
-				LOGINF("Task ID {} isolated in CLOS {}"_format(taskID, CLOSvalue));
-				ipc_NCR += ipcTask;
+				taskID = std::get<0>(item);
+				uint32_t outlierValue = std::get<1>(item);
+				auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple){return std::get<0>(tuple)  == taskID;});
+				taskPID = std::get<1>(*it1);
+				auto it = std::find_if(v_ipc.begin(), v_ipc.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+				double ipcTask = std::get<1>(*it);
+				// Find CLOS value
+				auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
+				uint64_t CLOSvalue = std::get<1>(*itT);
+
+				auto itC = CLOS_critical.begin();
+
+				if (outlierValue)
+				{
+					limit_task[taskID] = false;
+					LinuxBase::get_cat()->add_task(*itC,taskPID);
+					LOGINF("Task ID {} assigned to CLOS {}"_format(taskID,*itC));
+					itT = taskIsInCRCLOS.erase(itT);
+					taskIsInCRCLOS.push_back(std::make_pair(taskID,*itC));
+					itC = CLOS_critical.erase(itC);
+					ipc_CR += ipcTask;
+				}
+				else if (CLOSvalue < 5)
+				{
+					LinuxBase::get_cat()->add_task(1,taskPID);
+					LOGINF("Task ID {} assigned to CLOS 1"_format(taskID));
+					itT = taskIsInCRCLOS.erase(itT);
+					taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
+					ipc_NCR += ipcTask;
+				}
+				else if (CLOSvalue >= 5)
+				{
+					LOGINF("Task ID {} isolated in CLOS {}"_format(taskID, CLOSvalue));
+					ipc_NCR += ipcTask;
+				}
 			}
         }
 	}
@@ -2266,7 +2266,10 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 		//reset configuration if there is a change in critical apps
         if(change_in_outliers)
+		{
+			LOGINF("UPDATE CONFIGURATION");
             update_configuration(taskIsInCRCLOS, status, prev_critical_apps, critical_apps);
+		}
 		else
 		{
 			if ((critical_apps == 2) | (critical_apps == 3))
