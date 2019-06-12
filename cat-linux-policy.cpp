@@ -1969,13 +1969,13 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			case 1: // Non-critical
 				if((MPKIL3Task >= 4) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow)) // 1. Check if it is a bully
 				{
-					excluded[taskID] = true;
+					//excluded[taskID] = true;
 					outlier.push_back(std::make_pair(taskID,0));
 					LOGINF("Task {} is a bully--> NON-CRITICAL and ISOLATE"_format(taskID));
-					if(n_bully_apps < 2)
-						isolate_application(taskID, taskPID, itT, true);
-					else
-						LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
+					//if(n_bully_apps < 2)
+					//	isolate_application(taskID, taskPID, itT, true);
+					//else
+					//	LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
 				}
 				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. Check if it is critical
         		{
@@ -2019,17 +2019,17 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				else if ((MPKIL3Task >= 4) & (HPKIL3Task >= 10)) // 2. Check if it is a bully
 				{
-					excluded[taskID] = true;
+					//excluded[taskID] = true;
 					critical_apps--;
 					change_in_outliers = true;
 					outlier.push_back(std::make_pair(taskID,0));
 					LOGINF("Task {} is a bully--> NON-CRITICAL and ISOLATE"_format(taskID));
 					LLCoccup_critical.erase(taskID);
 					CLOS_critical.insert(CLOSvalue);
-					if(n_bully_apps < 2)
-						isolate_application(taskID, taskPID, itT, true);
-					else
-						LOGINF("There are no isolated CLOSes available --> CLOS 1");
+					//if(n_bully_apps < 2)
+					//	isolate_application(taskID, taskPID, itT, true);
+					//else
+					//	LOGINF("There are no isolated CLOSes available --> CLOS 1");
 				}
 				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit)) // 3. Check if it is still critical
 				{
@@ -2077,14 +2077,14 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			case 5: case 6: // Isolated
 				if ((MPKIL3Task >= 4) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow)) // 1. Check if it is a bully
 				{
-					excluded[taskID] = true;
+					//excluded[taskID] = true;
 					include_application(taskID,taskPID,itT,CLOSvalue,false);
 					outlier.push_back(std::make_pair(taskID,0));
 					LOGINF("Task {} is a bully--> NON-CRITICAL and ISOLATE"_format(taskID));
-					if(n_bully_apps < 2)
-						isolate_application(taskID, taskPID, itT, true);
-					else
-						LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
+					//if(n_bully_apps < 2)
+					//	isolate_application(taskID, taskPID, itT, true);
+					//else
+					//	LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
 				}
 				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. Check if it is critical
         		{
