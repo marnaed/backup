@@ -2090,7 +2090,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					critical_apps++;
 					change_in_outliers = true;
 				}
-				else if ((HPKIL3Task > 0.5) & (MPKIL3Task > 0.5)) // 4. Check if it is non-critical
+				else if (HPKIL3Task > 0.5) // 4. Check if it is non-critical
 				{
 					LOGINF("{}: isolated task has HPKIL3 {} >= 1 --> CLOS 1"_format(taskID, HPKIL3Task));
 					include_application(taskID,taskPID,itT,CLOSvalue,false);
