@@ -1967,7 +1967,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			case 1: // Non-critical
 				//if((MPKIL3Task >= 10) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow)) // 1. Check if it is a bully
 				if((MPKIL3Task >= 10) & (HPKIL3Task >= 20) & (IPCTask <= ipcLow))
-				//if((MPKIL3Task >= HPKIL3Task) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow))
+				//if(((MPKIL3Task >= 10) & (HPKIL3Task >= 20)) | (IPCTask <= ipcLow))
 				{
 					excluded[taskID] = true;
 					outlier.push_back(std::make_pair(taskID,0));
@@ -2024,6 +2024,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					//critical_apps++;
 				}
 				else if((MPKIL3Task >= 10) & (HPKIL3Task >= 20) & (IPCTask <= ipcLow))
+				//else if(((MPKIL3Task >= 10) & (HPKIL3Task >= 20)) | (IPCTask <= ipcLow))
 				//else if((MPKIL3Task >= HPKIL3Task) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow))
 				//else if ((((MPKIL3Task >= 7) & (HPKIL3Task >= 20)) | (MPKIL3Task > HPKIL3Task)) & (IPCTask <= ipcLow)) // 2. Check if it is a bully
 				{
@@ -2079,6 +2080,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				break;
 
 			case 5: case 6: // Isolated
+				//if(((MPKIL3Task >= 10) & (HPKIL3Task >= 20)) | (IPCTask <= ipcLow))
 				if((MPKIL3Task >= 10) & (HPKIL3Task >= 20) & (IPCTask <= ipcLow))
 				//if ( (((MPKIL3Task >= 10) & (HPKIL3Task >= 10)) | (MPKIL3Task > HPKIL3Task)) & (IPCTask <= ipcLow)) // 1. Check if it is a bully
 				{
