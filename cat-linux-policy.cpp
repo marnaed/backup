@@ -1511,7 +1511,15 @@ void CriticalAwareV3::isolate_application(uint32_t taskID, pid_t taskPID, std::v
 
 	LinuxBase::get_cat()->add_task(CLOS_isolated,taskPID);
 	LOGINF("[TEST] {}: assigned to CLOS {}"_format(taskID,CLOS_isolated));
-	LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
+
+	if (n_isolated_apps == 2)
+	{
+		mask_isolated = 0x0000f;
+		LinuxBase::get_cat()->set_cbm(5,0x0000f);
+		LinuxBase::get_cat()->set_cbm(6,0x0000f);
+	}
+	else
+		LinuxBase::get_cat()->set_cbm(CLOS_isolated,mask_isolated);
 	LOGINF("[TEST] CLOS {} has now mask {:x}"_format(CLOS_isolated,mask_isolated));
 
 	// Update taskIsInCRCLOS
@@ -1538,6 +1546,13 @@ void CriticalAwareV3::include_application(uint32_t taskID, pid_t taskPID, std::v
 		isolated_closes.insert(isolated_closes.begin(),CLOSvalue);
 		LOGINF("[TEST] CLOS {} pushed back to isolated_closes"_format(CLOSvalue));
 		n_isolated_apps--;
+		if (n_isolated_apps == 1)
+		{
+			if (CLOSvalue == 5)
+				LinuxBase::get_cat()->set_cbm(6,0x00003);
+			else
+				LinuxBase::get_cat()->set_cbm(5,0x00003);
+		}
 		LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
 		id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
 
