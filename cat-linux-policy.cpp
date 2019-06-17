@@ -2011,6 +2011,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 						else
 							 LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
 						outlier.push_back(std::make_pair(taskID,0));
+						excluded[taskID] = true;
 					}
 					else if ((l3_occup_mb > limit_space) & (HPKIL3Task < 0.5) & (MPKIL3Task < 0.5)) // 4. Check if it is isolated
 					{
@@ -2122,6 +2123,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				{
 					LOGINF("Task {} is still a SQUANDERER!"_format(taskID));
 					outlier.push_back(std::make_pair(taskID,0));
+					excluded[taskID] = true;
 				}
 				else if ((l3_occup_mb > limit_space) & (HPKIL3Task < 0.5) & (MPKIL3Task < 0.5))
 				{
@@ -2133,6 +2135,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					LOGINF("Task {} is now non-critical!"_format(taskID));
 					include_application(taskID,taskPID,itT,CLOSvalue,false);
 					outlier.push_back(std::make_pair(taskID,0));
+					excluded[taskID] = false;
 				}
 
 				/*else if (HPKIL3Task > 0.5) // 4. Check if it is non-critical
