@@ -1371,14 +1371,11 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 			else if ((CLOS >= 5) & (CLOS <= 6))
 			{
 				LOGINF("[UPDATE] Include isolated task {} to CLOS 1"_format(taskID));
-				include_application(taskID,taskPID,it2,CLOS,false);
-			}
-			else if ((CLOS >= 7) & (CLOS <= 8))
-			{
-				LOGINF("[UPDATE] Include bully task {} to CLOS 1"_format(taskID));
-				include_application(taskID,taskPID,it2,CLOS,true);
+				include_application(taskID,taskPID,it2,CLOS);
 			}
 
+			if (excluded[taskID] == true)
+				excluded[taskID] = false;
 		}
 
 		num_ways_CLOS_1 = __builtin_popcount(LinuxBase::get_cat()->get_cbm(1));
@@ -1483,31 +1480,17 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 
 }
 
-void CriticalAwareV3::isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, bool bullyB)
+void CriticalAwareV3::isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it)
 {
 	uint64_t CLOS_isolated, mask_isolated;
 	// Isolate it in a separate CLOS with two exclusive ways
-	if (bullyB)
-	{
-		n_bully_apps++;
-		LOGINF("[TEST] n_bully_apps = {}"_format(n_bully_apps));
-		auto closIT = bully_closes.begin();
-		CLOS_isolated = *closIT;
-		mask_isolated = clos_mask[CLOS_isolated];
-		closIT = bully_closes.erase(closIT);
-		id_bully.push_back(taskID);
-		bully[taskID] = true;
-	}
-	else
-	{
-		n_isolated_apps++;
-		LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
-		auto closIT = isolated_closes.begin();
-		CLOS_isolated = *closIT;
-		mask_isolated = clos_mask[CLOS_isolated];
-		closIT = isolated_closes.erase(closIT);
-		id_isolated.push_back(taskID);
-	}
+	n_isolated_apps++;
+	LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+	auto closIT = isolated_closes.begin();
+	CLOS_isolated = *closIT;
+	mask_isolated = clos_mask[CLOS_isolated];
+	closIT = isolated_closes.erase(closIT);
+	id_isolated.push_back(taskID);
 
 	LinuxBase::get_cat()->add_task(CLOS_isolated,taskPID);
 	LOGINF("[TEST] {}: assigned to CLOS {}"_format(taskID,CLOS_isolated));
@@ -1528,35 +1511,22 @@ void CriticalAwareV3::isolate_application(uint32_t taskID, pid_t taskPID, std::v
 
 }
 
-void CriticalAwareV3::include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue, bool bullyB)
+void CriticalAwareV3::include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue)
 {
 
-	if (bullyB)
+	isolated_closes.insert(isolated_closes.begin(),CLOSvalue);
+	LOGINF("[TEST] CLOS {} pushed back to isolated_closes"_format(CLOSvalue));
+	n_isolated_apps--;
+	if (n_isolated_apps == 1)
 	{
-		bully_closes.insert(bully_closes.begin(),CLOSvalue);
-		LOGINF("[TEST] CLOS {} pushed back to bully_closes"_format(CLOSvalue));
-		n_bully_apps--;
-		LOGINF("[TEST] n_bully_apps = {}"_format(n_bully_apps));
-        id_bully.erase(std::remove(id_bully.begin(), id_bully.end(), taskID), id_bully.end());
-		bully[taskID] = false;
-		excluded[taskID] = false;
+		if (CLOSvalue == 5)
+			LinuxBase::get_cat()->set_cbm(6,0x00003);
+		else
+			LinuxBase::get_cat()->set_cbm(5,0x00003);
 	}
-	else
-	{
-		isolated_closes.insert(isolated_closes.begin(),CLOSvalue);
-		LOGINF("[TEST] CLOS {} pushed back to isolated_closes"_format(CLOSvalue));
-		n_isolated_apps--;
-		if (n_isolated_apps == 1)
-		{
-			if (CLOSvalue == 5)
-				LinuxBase::get_cat()->set_cbm(6,0x00003);
-			else
-				LinuxBase::get_cat()->set_cbm(5,0x00003);
-		}
-		LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
-		id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
+	LOGINF("[TEST] n_isolated_apps = {}"_format(n_isolated_apps));
+	id_isolated.erase(std::remove(id_isolated.begin(), id_isolated.end(), taskID), id_isolated.end());
 
-	}
 
 	LinuxBase::get_cat()->add_task(1,taskPID);
 	it = taskIsInCRCLOS.erase(it);
@@ -1798,19 +1768,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 
 
 			if ((CLOSvalue >= 2) & (CLOSvalue <= 4))
-			{
 				LLCoccup_critical[taskID]= l3_occup_mb;
-				// Check app is not wasting time
-				/*if (ipc < ipcLow)
-				{
-					ipc_low_count[taskID]++;
-					if (ipc_low_count[taskID] > 5)
-					{
-						id_phase_change.push_back(taskID);
-						LOGINF("{}: too many intervals critical and with low IPC --> CHECK!"_format(taskID));
-					}
-				}*/
-			}
 
 			/**** IPC ICOV ****/
 			my_sum = ipc_sumXij[taskID] / ipc_phase_duration[taskID];
@@ -1824,12 +1782,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				ipc_phase_duration[taskID] = 1;
 				ipc_sumXij[taskID] = ipc;
 				id_phase_change.push_back(taskID);
-
-
-				//if(((CLOSvalue == 5) | (CLOSvalue == 6)) & (ipc_phase_duration[taskID] == 2))
-				//{
-				//	greedy[taskID]= true;
-				//}
 
 				if ((limit_task[taskID] == true) & (ipc < ipcMedium) & (CLOSvalue >= 2) & (CLOSvalue <= 4))
 				{
@@ -1896,7 +1848,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
             ipc_phase_duration[taskID] = 1;
             ipc_sumXij[taskID] = ipc;
 			excluded[taskID]= false;
-			//greedy[taskID] = false;
         }
 
 	}
@@ -1939,22 +1890,17 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 	/** Calculate limit outlier using 3std **/
 	double mean = acc::mean(macc);
 	double var = acc::variance(macc);
-	//double size = all_mpkil3.size();
-	//double q3 = *std::next(all_mpkil3.begin(), size*0.75);
 	double limit_outlier = mean + 1.5*std::sqrt(var);
 	LOGINF("MPKIL3 1.5std: {} -> mean {}, var {}"_format(limit_outlier,mean,var));
 	if (limit_outlier < 1)
 		limit_outlier = 1;
-	//double limit_outlier = q3;
-	//if (limit_outlier < 1)
-	//	limit_outlier = 1;
 	LOGINF("MPKIL3 LIMIT OUTLIER = {}"_format(limit_outlier));
 	LOGINF("HPKIL3 LIMIT OUTLIER = {}"_format(hpkil3Limit));
 
-	//critical_apps = 0;
 	for (auto const &x : id_phase_change)
 	{
 		taskID = x;
+
 		// Find HPKIL3
 		auto itH = std::find_if(v_hpkil3.begin(), v_hpkil3.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
         double HPKIL3Task = std::get<1>(*itH);
@@ -1979,6 +1925,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		auto it1 = std::find_if(id_pid.begin(), id_pid.end(),[&taskID](const auto& tuple){return std::get<0>(tuple)  == taskID;});
         taskPID = std::get<1>(*it1);
 
+		// Calculate limit space to consider a task Greedy
 		double limit_space = num_ways_CLOS_1 / 3;
 		if (limit_space > 3)
 			limit_space = 3;
@@ -1986,9 +1933,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 		switch (CLOSvalue)
 		{
 			case 1: // Non-critical
-				//if((MPKIL3Task >= 10) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow)) // 1. Check if it is a bully
-				if((MPKIL3Task >= 10) & (HPKIL3Task >= 20) & (IPCTask <= ipcLow))
-				//if(((MPKIL3Task >= 10) & (HPKIL3Task >= 20)) | (IPCTask <= ipcLow))
+				if((MPKIL3Task >= 10) & (HPKIL3Task >= 20) & (IPCTask <= ipcLow)) // 1. BULLY
 				{
 					excluded[taskID] = true;
 					outlier.push_back(std::make_pair(taskID,0));
@@ -1996,59 +1941,59 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				else
 				{
-					if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. Check if it is critical
+					if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. CRITICAL
 					{
 						LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(taskID,MPKIL3Task,limit_outlier,HPKIL3Task,hpkil3Limit));
 						outlier.push_back(std::make_pair(taskID,1));
 						critical_apps++;
 						change_in_outliers = true;
+						excluded[taskID] = false;
 					}
-					else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < hpkil3Limit)) // 3. Check if it is misuser
+					else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < hpkil3Limit)) // 3. SQUANDERER
 					{
 						LOGINF("The MPKI_L3 of task {} is an outlier but HPKIL3 is very low {}!! -> SQUANDERER"_format(taskID,HPKIL3Task));
 						if(n_isolated_apps < 2)
-							isolate_application(taskID,taskPID,itT,false);
+							isolate_application(taskID,taskPID,itT);
 						else
 							 LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
 						outlier.push_back(std::make_pair(taskID,0));
 						excluded[taskID] = true;
 					}
-					else if ((l3_occup_mb > limit_space) & (HPKIL3Task < 0.5) & (MPKIL3Task < 0.5)) // 4. Check if it is isolated
+					else if ((l3_occup_mb > limit_space) & (HPKIL3Task < 0.5) & (MPKIL3Task < 0.5)) // 4. GREEDY
 					{
 						LOGINF("[TEST] {}: has l3_occup_mb {} -> isolate!"_format(taskID,l3_occup_mb));
 						if(n_isolated_apps < 2)
-							isolate_application(taskID,taskPID,itT,false);
+							isolate_application(taskID,taskPID,itT);
 						else
 							 LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
 						outlier.push_back(std::make_pair(taskID,0));
+						excluded[taskID] = false;
 					}
-					else
+					else // 5. NON-CRITICAL
 					{
 						LOGINF("Task {} is still non-critical!"_format(taskID));
 						outlier.push_back(std::make_pair(taskID,0));
+						excluded[taskID] = false;
 					}
 
-					if (excluded[taskID] == true)
-					{
-						excluded[taskID] = false;
-						valid_mpkil3[taskID].clear();
-						valid_mpkil3[taskID].push_front(MPKIL3Task);
-					}
+					// Non-exclude task if it is no longer squanderer or bully
+					// (excluded[taskID] == true)
+					//
+					//xcluded[taskID] = false;
+					//alid_mpkil3[taskID].clear();
+					//alid_mpkil3[taskID].push_front(MPKIL3Task);
+					//
 				}
 				break;
 
 			case 2: case 3: case 4: // Critical
 				// 1. Check if it is profitable
-				if ((HPKIL3Task > MPKIL3Task) & (MPKIL3Task < limit_outlier))
+				if ((HPKIL3Task > MPKIL3Task) & (MPKIL3Task < limit_outlier)) // 1. PROFITABLE CRITICAL
 				{
 					LOGINF("Critical task {} is profitable so continue critical"_format(taskID));
 					outlier.push_back(std::make_pair(taskID,1));
-					//critical_apps++;
 				}
-				else if((MPKIL3Task >= 10) & (HPKIL3Task >= 20) & (IPCTask <= ipcLow))
-				//else if(((MPKIL3Task >= 10) & (HPKIL3Task >= 20)) | (IPCTask <= ipcLow))
-				//else if((MPKIL3Task >= HPKIL3Task) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow))
-				//else if ((((MPKIL3Task >= 7) & (HPKIL3Task >= 20)) | (MPKIL3Task > HPKIL3Task)) & (IPCTask <= ipcLow)) // 2. Check if it is a bully
+				else if((MPKIL3Task >= 10) & (HPKIL3Task >= 20) & (IPCTask <= ipcLow)) // 2. BULLY
 				{
 					excluded[taskID] = true;
 					critical_apps--;
@@ -2058,39 +2003,22 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 					LLCoccup_critical.erase(taskID);
 					CLOS_critical.insert(CLOSvalue);
 				}
-				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit)) // 3. Check if it is still critical
+				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit)) // 3. STILL CRITICAL
 				{
-					/*if ((IPCTask <= ipcLow) & (critical_apps == 1))
-					{
-						//excluded[taskID] = true;
-						LOGINF("Task {} is not profitable!-> noncritical"_format(taskID));
-						critical_apps--;
-						change_in_outliers = true;
-						outlier.push_back(std::make_pair(taskID,0));
-						LLCoccup_critical.erase(taskID);
-						CLOS_critical.insert(CLOSvalue);
-						//if(n_bully_apps < 2)
-						//	isolate_application(taskID, taskPID, itT, true);
-						//else
-						//	LOGINF("There are no isolated CLOSes available --> CLOS 1");
-					}
-					else
-					{*/
-						LOGINF("Task {} is still critical!"_format(taskID));
-						outlier.push_back(std::make_pair(taskID,1));
-					//}
+					LOGINF("Task {} is still critical!"_format(taskID));
+					outlier.push_back(std::make_pair(taskID,1));
 				}
-				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < hpkil3Limit)) // 4. Check if it is misuser
+				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < hpkil3Limit)) // 4. SQUANDERER
 				{
 					LOGINF("The MPKI_L3 of task {} is an outlier but HPKIL3 is very low {}!! -> SQUANDERER"_format(taskID,HPKIL3Task));
 					if(n_isolated_apps < 2)
-						isolate_application(taskID,taskPID,itT,false);
+						isolate_application(taskID,taskPID,itT);
 					else
 						 LOGINF("There are no isolated CLOSes available --> remain in CLOS 1");
 					outlier.push_back(std::make_pair(taskID,0));
+					excluded[taskID] = true;
 				}
-
-				else
+				else // 5. NON-CRITICAL
 				{
 					LOGINF("Task {} is now non-critical!"_format(taskID));
 					outlier.push_back(std::make_pair(taskID,0));
@@ -2101,95 +2029,43 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 				}
 				break;
 
-			case 5: case 6: // Isolated
-				//if(((MPKIL3Task >= 10) & (HPKIL3Task >= 20)) | (IPCTask <= ipcLow))
-				if((MPKIL3Task >= 10) & (HPKIL3Task >= 20) & (IPCTask <= ipcLow))
-				//if ( (((MPKIL3Task >= 10) & (HPKIL3Task >= 10)) | (MPKIL3Task > HPKIL3Task)) & (IPCTask <= ipcLow)) // 1. Check if it is a bully
+			case 5: case 6: // Greedy or squanderer
+				if((MPKIL3Task >= 10) & (HPKIL3Task >= 20) & (IPCTask <= ipcLow)) // 1. BULLY
 				{
 					excluded[taskID] = true;
-					include_application(taskID,taskPID,itT,CLOSvalue,false);
+					include_application(taskID,taskPID,itT,CLOSvalue);
 					outlier.push_back(std::make_pair(taskID,0));
 					LOGINF("Task {} is a bully--> exclude and CLOS 1"_format(taskID));
 				}
-				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. Check if it is critical
+				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. CRITICAL
         		{
 					LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(taskID,MPKIL3Task,limit_outlier,HPKIL3Task,hpkil3Limit));
-					include_application(taskID,taskPID,itT,CLOSvalue,false);
+					include_application(taskID,taskPID,itT,CLOSvalue);
 					outlier.push_back(std::make_pair(taskID,1));
 					critical_apps++;
 					change_in_outliers = true;
+					excluded[taskID] = false;
 				}
-				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < hpkil3Limit))
+				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task < hpkil3Limit)) // 3. SQUANDERER
 				{
 					LOGINF("Task {} is still a SQUANDERER!"_format(taskID));
 					outlier.push_back(std::make_pair(taskID,0));
 					excluded[taskID] = true;
 				}
-				else if ((l3_occup_mb > limit_space) & (HPKIL3Task < 0.5) & (MPKIL3Task < 0.5))
+				else if ((l3_occup_mb > limit_space) & (HPKIL3Task < 0.5) & (MPKIL3Task < 0.5)) // 4. GREEDY
 				{
 					LOGINF("Task {} is still GREEDY!"_format(taskID));
 					outlier.push_back(std::make_pair(taskID,0));
+					excluded[taskID] = false;
 				}
-				else
+				else // 5. NON-CRITICAL
 				{
 					LOGINF("Task {} is now non-critical!"_format(taskID));
-					include_application(taskID,taskPID,itT,CLOSvalue,false);
+					include_application(taskID,taskPID,itT,CLOSvalue);
 					outlier.push_back(std::make_pair(taskID,0));
 					excluded[taskID] = false;
 				}
-
-				/*else if (HPKIL3Task > 0.5) // 4. Check if it is non-critical
-				{
-					LOGINF("{}: isolated task has HPKIL3 {} >= 1 --> CLOS 1"_format(taskID, HPKIL3Task));
-					include_application(taskID,taskPID,itT,CLOSvalue,false);
-					outlier.push_back(std::make_pair(taskID,0));
-				}
-				else if ((MPKIL3Task > 0.5))
-				{
-					LOGINF("{}: isolated task has MPKIL3 {} >= 0.5 --> CLOS 1"_format(taskID, MPKIL3Task));
-					include_application(taskID,taskPID,itT,CLOSvalue,false);
-					outlier.push_back(std::make_pair(taskID,0));
-				}
-				else
-				{
-					LOGINF("Task {} is still isolated!"_format(taskID));
-					outlier.push_back(std::make_pair(taskID,0));
-				}*/
 				break;
-
-			/*case 7: case 8: // Bully
-				// 1. Check if it is non-critical
-				if (IPCTask < 0.45)
-				{
-					LOGINF("{}: bully task has ipc {} < 0.45 --> CLOS 1"_format(taskID, HPKIL3Task, IPCTask));
-					include_application(taskID,taskPID,itT,CLOSvalue,true);
-					outlier.push_back(std::make_pair(taskID,0));
-				}
-				else if ((MPKIL3Task >= 4) & (HPKIL3Task >= 10) & (IPCTask <= ipcLow)) // 1. Check if it is a bully
-				{
-					LOGINF("Task {} is still a bully!"_format(taskID));
-					outlier.push_back(std::make_pair(taskID,0));
-				}
-				else if ((MPKIL3Task >= limit_outlier) & (HPKIL3Task >= hpkil3Limit) & (IPCTask <= ipcMedium)) // 2. Check if it is critical
-        		{
-					LOGINF("The MPKI_L3 of task {} is an outlier, since MPKIL3 {} >= {} & HPKIL3 {} >= {}"_format(taskID,MPKIL3Task,limit_outlier,HPKIL3Task,hpkil3Limit));
-					include_application(taskID,taskPID,itT,CLOSvalue,true);
-					outlier.push_back(std::make_pair(taskID,1));
-					critical_apps++;
-					change_in_outliers = true;
-				}
-			 	else if ((HPKIL3Task < 10) & (MPKIL3Task < 4))
-				{
-					LOGINF("{}: bully task has HPKIL3 {} < 10 and MPKIL3 {} < 4 --> CLOS 1"_format(taskID, HPKIL3Task, MPKIL3Task));
-					include_application(taskID,taskPID,itT,CLOSvalue,true);
-					outlier.push_back(std::make_pair(taskID,0));
-				}
-				else
-				{
-					LOGINF("Task {} is still a bully!"_format(taskID));
-					outlier.push_back(std::make_pair(taskID,0));
-				}
-				break;*/
 		}
 	}
 
