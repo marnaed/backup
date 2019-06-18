@@ -250,9 +250,7 @@ class CriticalAwareV3: public LinuxBase
 	double icov = 1;
 	double hpkil3Limit = 0;
 
-    //Masks of CLOS
-    //uint64_t maskCrCLOS = 0xfffff;
-	uint32_t critical_apps = 0;
+    // Masks and number of ways of CLOS
 	uint64_t maskCLOS2 = 0xfffff;
 	uint64_t maskCLOS3 = 0xfffff;
 	uint64_t maskCLOS4 = 0xfffff;
@@ -264,63 +262,62 @@ class CriticalAwareV3: public LinuxBase
 	uint64_t prev_critical_apps = 0;
     int64_t num_shared_ways = 0;
 
+	// Window size of MPKIL3 valies
 	uint64_t windowSize = 10;
 
+	// Bool variable to state if cache is partitioned for the first time
 	bool firstTime = true;
 
-    //Control of the changes made in the masks
+    // Control of the changes made in the masks
     uint64_t state = 0;
     double expectedIPCtotal = 0;
     double ipc_CR_prev = 0;
     double ipc_NCR_prev = 0;
+	std::map<uint64_t, double> prev_ipc;
 
 	// Limit outlier calculation variables
     double mpkiL3Mean = 0;
 	double stdmpkiL3Mean = 0;
 
 	// Isolation mechanism variables
-    uint64_t n_isolated_apps = 0;
-	uint64_t n_bully_apps = 0;
+    std::vector<uint32_t> id_isolated;
+	uint64_t n_isolated_apps = 0;
 	std::vector<uint64_t> isolated_closes = {5, 6};
-	std::vector<uint64_t> bully_closes = {7, 8};
 	std::map<uint64_t, uint64_t> clos_mask = {
-          { 5, 0x0000f },
-          { 6, 0x0000f },
+          { 5, 0x00003 },
+          { 6, 0x00003 },
           { 7, 0x000ff },
 		  { 8, 0x000ff },
 	};
 
-	std::vector<uint32_t> id_isolated;
-	std::vector<uint32_t> id_bully;
-	//std::vector<uint32_t> id_phase_change;
-
+	// Critical applications variables
+	uint32_t critical_apps = 0;
 	std::map<uint64_t,double> LLCoccup_critical;
 	std::set<uint32_t> CLOS_critical = {2, 3, 4};
 
-	// dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
+	// Dictionary holding up to windowsize[taskID] last MPKIL3 valid (non-spike) values
     std::map<uint32_t, std::deque<double>> valid_mpkil3;
 
-    // dictionaries holdind phase info for each task
+    // Dictionaries holdind phase info for each task
 	std::map<uint32_t, uint64_t> ipc_phase_count;
-	std::map<uint32_t, uint64_t> limit_task;
-    std::map<uint32_t, uint64_t> ipc_phase_duration;
-	std::map<uint32_t, bool> bully;
-
-    // dictionary holding sum of MPKIL3 of each application during a given phase
+	std::map<uint32_t, uint64_t> ipc_phase_duration;
+	// Dictionary holding sum of MPKIL3 of each application during a given phase
 	std::map<uint32_t, double> ipc_sumXij;
+
+	// Dictionary and bool variable to indicate in critical app / space has been reduced
+	std::map<uint32_t, uint64_t> limit_task;
+   	bool limit = false;
+
 	// Map of windowSizes
     std::map<uint64_t, double> windowSizeM;
 
 	// Set to true if app has HPKIL3 low and high MPKIL3
+	// i.e. bully or squaderer applications
 	// In order for next interval to not contaminate
 	// set of MPKIL3 values
 	std::map<uint64_t, bool> excluded;
-	//std::map<uint64_t, bool> ipc_phase_change;
-	//std::map<uint64_t, bool> SUPERipc_phase_change;
-	//std::map<uint64_t, bool> ipc_icov;
 
-	bool limit = false;
-
+	// Idle variables
     uint64_t idle_count = idleIntervals;
     bool idle = false;
 
@@ -334,8 +331,6 @@ class CriticalAwareV3: public LinuxBase
     >
     ca_accum_t;
 
-	std::map<uint64_t, double> prev_ipc;
-
     //vector to store if task is assigned to critical CLOS
 	typedef std::tuple<uint32_t, uint64_t> pair_t;
     typedef std::tuple<uint32_t, double> pairD_t;
@@ -343,12 +338,7 @@ class CriticalAwareV3: public LinuxBase
     std::vector<pair_t> taskIsInCRCLOS;
 	std::vector<pair32P_t> id_pid;
 
-	// number of times a task has been critical
-	std::map<pid_t,uint64_t> frequencyCritical;
-
     public:
-
-	//typedef std::tuple<pid_t, uint64_t> pair_t
 
     CriticalAwareV3(uint64_t _every, uint64_t _firstInterval, uint64_t _idleIntervals, double _ipcMedium, double _ipcLow, double _icov, double _hpkil3Limit) : every(_every), firstInterval(_firstInterval), idleIntervals(_idleIntervals), ipcLow(_ipcLow), ipcMedium(_ipcMedium), icov(_icov), hpkil3Limit(_hpkil3Limit) {}
 
@@ -356,8 +346,8 @@ class CriticalAwareV3: public LinuxBase
 
     //configure CAT
 	void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
-	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue, bool bullyB);
-	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, bool bullyB);
+	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue);
+	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it);
 	void divide_2_critical(uint64_t clos);
 	void divide_3_critical(uint64_t clos, bool limitDone);
 	virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
