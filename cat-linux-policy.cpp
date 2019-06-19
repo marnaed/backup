@@ -1772,6 +1772,9 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			if ((CLOSvalue >= 2) & (CLOSvalue <= 4))
 				LLCoccup_critical[taskID]= l3_occup_mb;
 
+			if ((CLOSvalue == 5) | (CLOSvalue == 6))
+				LOGINF("[ISO] Isolated task {} ({}) is in CLOS {} and has IPC {}"_format(taskID,taskName,CLOSvalue,ipc));
+
 			/**** IPC ICOV ****/
 			my_sum = ipc_sumXij[taskID] / ipc_phase_duration[taskID];
 			prev_sum = (ipc_sumXij[taskID] - ipc) / (ipc_phase_duration[taskID] - 1);
