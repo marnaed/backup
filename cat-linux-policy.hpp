@@ -273,7 +273,6 @@ class CriticalAwareV3: public LinuxBase
     double expectedIPCtotal = 0;
     double ipc_CR_prev = 0;
     double ipc_NCR_prev = 0;
-	std::map<uint64_t, double> prev_ipc;
 
 	// Limit outlier calculation variables
     double mpkiL3Mean = 0;
@@ -307,9 +306,6 @@ class CriticalAwareV3: public LinuxBase
 	// Dictionary and bool variable to indicate in critical app / space has been reduced
 	std::map<uint32_t, uint64_t> limit_task;
    	bool limit = false;
-
-	// Map of windowSizes
-    std::map<uint64_t, double> windowSizeM;
 
 	// Set to true if app has HPKIL3 low and high MPKIL3
 	// i.e. bully or squaderer applications

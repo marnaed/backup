@@ -1757,7 +1757,7 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			std::deque<double> deque_mpkil3 = it2->second;
 
 			// Remove values until vector size is equal to sliding window size
-			while (deque_mpkil3.size() >= windowSizeM[taskID])
+			while (deque_mpkil3.size() >= windowSize)
 				deque_mpkil3.pop_back();
 
 			auto itT = std::find_if(taskIsInCRCLOS.begin(), taskIsInCRCLOS.end(),[&taskID](const auto& tuple) {return std::get<0>(tuple) == taskID;});
@@ -1848,7 +1848,6 @@ void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklis
 			LOGINF("NEW ENTRY IN DICT valid_mpkil3 added");
 			valid_mpkil3[taskID].push_front(MPKIL3);
 			taskIsInCRCLOS.push_back(std::make_pair(taskID,1));
-			windowSizeM[taskID] = windowSize;
 			ipc_phase_count[taskID] = 1;
             ipc_phase_duration[taskID] = 1;
             ipc_sumXij[taskID] = ipc;
