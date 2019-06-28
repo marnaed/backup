@@ -344,6 +344,7 @@ class CriticalAwareV3: public LinuxBase
 	void update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new);
 	void include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue);
 	void isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it);
+	void divide_1_critical(uint64_t clos);
 	void divide_2_critical(uint64_t clos);
 	void divide_3_critical(uint64_t clos, bool limitDone);
 	virtual void apply(uint64_t current_interval, const tasklist_t &tasklist);
