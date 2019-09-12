@@ -9,7 +9,7 @@ if [[ $? -ne 4 ]]; then
 fi
 
 OPTIONS=
-LONGOPTIONS=max-rep:,ini-rep:,clog-min:
+LONGOPTIONS=max-rep:,ini-rep:,clog-min:,toplev
 
 # -temporarily store output to be able to check for errors
 # -e.g. use “--options” parameter by name to activate quoting/enhanced mode
@@ -27,6 +27,7 @@ eval set -- "$PARSED"
 INI_REP=0
 MAX_REP=3
 CLOG_MIN=inf
+TOPLEV=false
 while true; do
     case "$1" in
         --max-rep)
@@ -40,7 +41,11 @@ while true; do
         --clog-min)
             CLOG_MIN="$2"
             shift 2
-            ;;
+			;;
+		--toplev)
+			TOPLEV=true
+			shift 1
+			;;
         --)
             shift
             break
@@ -101,7 +106,16 @@ for ((REP=${INI_REP};REP<${MAX_REP};REP++)); do
 			python3 ${DIR}/makoc.py template.mako --lookup "${DIR}/templates" --defs '{apps: ['$(join_by , ${WL[@]})'], mask: '$MASK'}'> ${CONFIG} || exit 1
 
 			echo ./manager --config ${CONFIG} -o ${OUT} --fin-out ${FIN_OUT} --total-out ${TOT_OUT} --flog-min inf --clog-min ${CLOG_MIN} --log-file $LOG
-			./manager --config ${CONFIG} -o ${OUT} --fin-out ${FIN_OUT} --total-out ${TOT_OUT} --flog-min inf --clog-min ${CLOG_MIN} --log-file $LOG
+			if $TOPLEV; then
+				echo ./manager --config ${CONFIG} -o ${OUT} --fin-out ${FIN_OUT} --total-out ${TOT_OUT} --flog-min inf --clog-min ${CLOG_MIN} --log-file $LOG > auxComm.bash
+				chmod +x auxComm.bash
+				${HOME}/manager/pmu-tools/toplev.py -l1 --single-thread --o data/${ID}_${REP}_toplev.txt ./auxComm.bash
+				rm auxComm.bash
+			else
+				./manager --config ${CONFIG} -o ${OUT} --fin-out ${FIN_OUT} --total-out ${TOT_OUT} --flog-min inf --clog-min ${CLOG_MIN} --log-file $LOG
+			fi
+
+			rm -r run
 
 		done < $WORKLOADS
 	done
