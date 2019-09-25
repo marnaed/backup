@@ -2,10 +2,10 @@
 
 #include <chrono>
 #include <fstream>
+#include<iostream>
 #include <vector>
 
 #include <boost/filesystem.hpp>
-
 
 std::ifstream open_ifstream(const boost::filesystem::path &path);
 std::ofstream open_ofstream(const boost::filesystem::path &path);
@@ -16,6 +16,8 @@ void dir_copy_contents(const std::string &source, const std::string &dest);
 std::string random_string(size_t length);
 void drop_privileges();
 void set_cpu_affinity(std::vector<uint32_t> cpus, pid_t pid=0);
+int get_self_cpu_id();
+int get_cpu_id(pid_t pid);
 void assert_dir_exists(const boost::filesystem::path &dir);
 
 void pid_get_children_rec(const pid_t pid, std::vector<pid_t> &children);

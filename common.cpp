@@ -169,6 +169,63 @@ void set_cpu_affinity(std::vector<uint32_t> cpus, pid_t pid)
 }
 
 
+int get_self_cpu_id()
+{
+    /* Get the the current process' stat file from the proc filesystem */
+	std::ifstream myReadFile;
+	myReadFile.open("/proc/self/stat");
+	char cNum[10];
+	int i=0;
+	int cpu_id = -1;
+	bool found = false;
+
+	while(!myReadFile.eof() & !found)
+	{
+		if (i < 38)
+		{
+			myReadFile.getline(cNum, 256, ' ');
+			i = i + 1;
+		}
+		else
+		{
+			myReadFile.getline(cNum, 256, ' ');
+			cpu_id = atoi(cNum);
+			found = true;
+		}
+	}
+
+    return cpu_id;
+}
+
+int get_cpu_id(pid_t pid)
+{
+    /* Get the the current process' stat file from the proc filesystem */
+	std::ifstream myReadFile;
+	myReadFile.open("/proc/{}/stat"_format(pid));
+	char cNum[10];
+	int i=0;
+	int cpu_id = -1;
+	bool found = false;
+
+	while(!myReadFile.eof() & !found)
+	{
+		if (i < 38)
+		{
+			myReadFile.getline(cNum, 256, ' ');
+			i = i + 1;
+		}
+		else
+		{
+			myReadFile.getline(cNum, 256, ' ');
+			cpu_id = atoi(cNum);
+			found = true;
+		}
+	}
+
+    return cpu_id;
+}
+
+
 void pid_get_children_rec(const pid_t pid, std::vector<pid_t> &children)
 {
 	std::ifstream proc_children;
