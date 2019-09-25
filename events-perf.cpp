@@ -190,6 +190,7 @@ std::vector<counters_t> Perf::read_counters(pid_t pid,std::shared_ptr<CAT> cat)
     const auto closnum = "clos_num";
     const auto numways = "num_ways";
     const auto maskhex = "clos_mask";
+	const auto cpu = "CPU";
 
 	auto result = std::vector<counters_t>();
 
@@ -214,6 +215,7 @@ std::vector<counters_t> Perf::read_counters(pid_t pid,std::shared_ptr<CAT> cat)
 			counters.insert({i++, closnum, get_clos_pid(pid,cat), "", true, 1, 1});
 			counters.insert({i++, maskhex, get_mask_pid(pid,cat), "", true, 1, 1});
 			counters.insert({i++, numways, get_num_ways_pid(pid,cat), "", true, 1, 1});
+			counters.insert({i++, cpu, get_cpu_id(pid), "", true, 1, 1});
 
 			first = false;
 		}
@@ -236,6 +238,8 @@ std::vector<std::vector<std::string>> Perf::get_names(pid_t pid)
 	const auto numways = "num_ways";
 	const auto maskhex = "clos_mask";
 
+	const auto cpu = "CPU";
+
 	bool first = true;
 	for (const auto &evlist : pid_events[pid].groups)
 	{
@@ -253,6 +257,7 @@ std::vector<std::vector<std::string>> Perf::get_names(pid_t pid)
 			v.push_back(closnum);
 			v.push_back(numways);
 			v.push_back(maskhex);
+			v.push_back(cpu);
 			first = false;
 		}
 		r.push_back(v);

@@ -9,6 +9,7 @@
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/member.hpp>
 #include "cat-linux.hpp"
+#include "common.hpp"
 #include "throw-with-trace.hpp"
 
 
