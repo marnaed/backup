@@ -381,8 +381,9 @@ void task_restart_or_set_done(Task &task, cat_ptr_t cat, Perf &perf, const std::
 
 void task_stats_print_interval(const Task &t, uint64_t interval, std::ostream &out, const std::string &sep)
 {
+	int cpu_id = get_cpu_id(t.pid);
 	out << interval << sep << std::setfill('0') << std::setw(2);
-	out << t.id << "_" << t.name << sep;
+	out << t.id << "_" << t.name << sep << cpu_id << sep;
 
 	// out << (t.max_instr ? (double) t.stats.get_current("instructions") / (double) t.max_instr : 0) << sep;
 	double completed = t.max_instr ?
@@ -396,8 +397,9 @@ void task_stats_print_interval(const Task &t, uint64_t interval, std::ostream &o
 
 void task_stats_print_total(const Task &t, uint64_t interval, std::ostream &out, const std::string &sep)
 {
+	int cpu_id = get_cpu_id(t.pid);
 	out << interval << sep << std::setfill('0') << std::setw(2);
-	out << t.id << "_" << t.name << sep;
+	out << t.id << "_" << t.name << sep << cpu_id << sep;
 	double completed = t.max_instr ?
 			(double) t.stats.sum("instructions") / (double) t.max_instr :
 			NAN;
@@ -411,6 +413,7 @@ void task_stats_print_headers(const Task &t, std::ostream &out, const std::strin
 {
 	out << "interval" << sep;
 	out << "app" << sep;
+	out << "CPU" << sep;
 	out << "compl" << sep;
 	out << t.stats.header_to_string(sep);
 	out << std::endl;
