@@ -1318,7 +1318,7 @@ void CriticalAwareV4::apply(uint64_t current_interval, const tasklist_t &tasklis
  * cache configuration to another, i.e. when a different
  * number of critical apps is detected
  */
-void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new)
+void CriticalPhaseAware::update_configuration(std::vector<pair_t> v, std::vector<pair_t> status, uint64_t num_critical_old, uint64_t num_critical_new)
 {
 
 	uint64_t new_clos;
@@ -1483,7 +1483,7 @@ void CriticalAwareV3::update_configuration(std::vector<pair_t> v, std::vector<pa
 
 }
 
-void CriticalAwareV3::isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it)
+void CriticalPhaseAware::isolate_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it)
 {
 	uint64_t CLOS_isolated, mask_isolated;
 	// Isolate it in a separate CLOS with two exclusive ways
@@ -1514,7 +1514,7 @@ void CriticalAwareV3::isolate_application(uint32_t taskID, pid_t taskPID, std::v
 
 }
 
-void CriticalAwareV3::include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue)
+void CriticalPhaseAware::include_application(uint32_t taskID, pid_t taskPID, std::vector<pair_t>::iterator it, uint64_t CLOSvalue)
 {
 
 	isolated_closes.insert(isolated_closes.begin(),CLOSvalue);
@@ -1538,7 +1538,7 @@ void CriticalAwareV3::include_application(uint32_t taskID, pid_t taskPID, std::v
 	LOGINF("[TEST] {}: return to CLOS 1"_format(taskID));
 }
 
-void CriticalAwareV3::divide_3_critical(uint64_t clos, bool limitDone)
+void CriticalPhaseAware::divide_3_critical(uint64_t clos, bool limitDone)
 {
 	uint64_t maxWays = std::max(num_ways_CLOS_2,num_ways_CLOS_3);
 	maxWays = std::max(maxWays,num_ways_CLOS_4);
@@ -1623,7 +1623,7 @@ void CriticalAwareV3::divide_3_critical(uint64_t clos, bool limitDone)
 
 
 
-void CriticalAwareV3::divide_2_critical(uint64_t clos)
+void CriticalPhaseAware::divide_2_critical(uint64_t clos)
 {
 	uint32_t maxWays = std::max(num_ways_CLOS_2,num_ways_CLOS_3);
 
@@ -1679,7 +1679,7 @@ void CriticalAwareV3::divide_2_critical(uint64_t clos)
 
 }
 
-void CriticalAwareV3::divide_1_critical(uint64_t clos)
+void CriticalPhaseAware::divide_1_critical(uint64_t clos)
 {
 	uint64_t maxWays = 0;
 	switch (clos)
@@ -1764,9 +1764,9 @@ void CriticalAwareV3::divide_1_critical(uint64_t clos)
 
 }
 
-void CriticalAwareV3::apply(uint64_t current_interval, const tasklist_t &tasklist)
+void CriticalPhaseAware::apply(uint64_t current_interval, const tasklist_t &tasklist)
 {
-    LOGINF("CAT Policy name: Critical-Aware V3");
+    LOGINF("CAT Policy name: Critical Phase-Aware (CPA)");
 	LOGINF("Current_interval = {}"_format(current_interval));
 
 	// Apply only when the amount of intervals specified has passed
