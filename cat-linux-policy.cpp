@@ -1827,7 +1827,6 @@ void CriticalPhaseAware::apply(uint64_t current_interval, const tasklist_t &task
 
 		double my_sum, prev_sum;
 
-        //LOGINF("Task {}: MPKI_L3 = {}"_format(taskName,MPKIL3));
         LOGINF("Task {} ({}): IPC = {}, HPKIL3 = {}, MPKIL3 = {}, l3_occup_mb {}"_format(taskName,taskID,ipc,HPKIL3,MPKIL3,l3_occup_mb));
 
 		// Create tuples and add them to vectors
@@ -1859,27 +1858,8 @@ void CriticalPhaseAware::apply(uint64_t current_interval, const tasklist_t &task
 			ipc_sumXij[taskID] += ipc;
 			ipc_phase_duration[taskID] += 1;
 
-
 			if ((CLOSvalue >= 2) & (CLOSvalue <= 4))
-			{
 				LLCoccup_critical[taskID]= l3_occup_mb;
-
-				/*// Check if critical app is medium
-				if ((ipc >= ipcMedium) & (limit_task[taskID] == false))
-				{
-					LOGINF("Critical app is medium! Reduce");
-					if (critical_apps == 1)
-					{
-						divide_1_critical(CLOSvalue);
-						limit_task[taskID] = true;
-					}
-					else
-					{
-						divide_2_critical(CLOSvalue);
-						limit_task[taskID] = true;
-					}
-				}*/
-			}
 
 			if ((CLOSvalue == 5) | (CLOSvalue == 6))
 				LOGINF("[ISO] Isolated task {} ({}) is in CLOS {} and has IPC {}"_format(taskID,taskName,CLOSvalue,ipc));
@@ -1983,7 +1963,6 @@ void CriticalPhaseAware::apply(uint64_t current_interval, const tasklist_t &task
 			// Store queue modified in the dictionary
 			valid_mpkil3[taskID] = deque_mpkil3;
 
-			// Check if critical app is medium
 		}
         else
         {
@@ -2001,7 +1980,6 @@ void CriticalPhaseAware::apply(uint64_t current_interval, const tasklist_t &task
 
 	LOGINF("Total L3 occupation: {}"_format(l3_occup_mb_total));
 	LOGINF("IPC total: {}"_format(ipcTotal));
-
 
 	if (current_interval < firstInterval)
 	{
@@ -2431,7 +2409,6 @@ void CriticalPhaseAware::apply(uint64_t current_interval, const tasklist_t &task
 
 			}
 			else if ((critical_apps == 2) | (critical_apps == 3))
-			//if (critical_apps == 2)
 			{
 				// Check occupancy of critical apps
 				auto x = std::max_element(LLCoccup_critical.begin(), LLCoccup_critical.end(),[](const std::pair<int, int>& p1, const std::pair<int, int>& p2) {return p1.second < p2.second; });
