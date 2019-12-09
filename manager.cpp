@@ -153,7 +153,7 @@ void loop(
 
 		// Get CPU of manager
 		int cpu_manager =  get_self_cpu_id();
-		LOGINF("----> Manager is in CPU {}"_format(cpu_manager));
+		LOGDEB("----> Manager is in CPU {}"_format(cpu_manager));
 
 		// Process tasks...
 		for (const auto &task_ptr : schedlist)
@@ -161,7 +161,7 @@ void loop(
 			Task &task = *task_ptr;
 			// Get CPU of task
 			int cpu_id = get_cpu_id(task.pid);
-			LOGINF("----> Task {} is in CPU {}"_format(task.pid,cpu_id));
+			LOGDEB("----> Task {} is in CPU {}"_format(task.pid,cpu_id));
 			// Read stats
 			const counters_t counters = perf.read_counters(task.pid, catpol->get_cat())[0];
 			task.stats.accum(counters);
