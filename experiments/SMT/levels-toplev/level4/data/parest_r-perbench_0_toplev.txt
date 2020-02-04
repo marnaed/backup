@@ -1,0 +1,15 @@
+# 3.5-full on Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz
+FE             Frontend_Bound.Frontend_Bandwidth:         13.43 +-     0.00 % Slots
+	This metric represents fraction of slots the CPU was stalled
+	due to Frontend bandwidth issues...
+BAD            Bad_Speculation.Machine_Clears:            11.56 +-     0.00 % Slots
+	This metric represents fraction of slots the CPU has wasted
+	due to Machine Clears...
+	Sampling events:  machine_clears.count
+BE/Core        Backend_Bound.Core_Bound:                 100.00 +-     0.00 % Slots <==
+	This metric represents fraction of slots where Core non-
+	memory issues were of a bottleneck...
+BE             Backend_Bound:                            100.00 +-     0.00 % Slots
+	This category represents fraction of slots where no uops are
+	being delivered due to a lack of required resources for
+	accepting new uops in the Backend...

@@ -1,0 +1,7 @@
+-[perlbench,x264_r]
+-[cactuBSSN_r,tonto]
+-[mcf,calculix]
+-[cam4_r,hmmer]
+-[calculix,hmmer]
+-[mcf,bwaves]
+-[mcf,fotonik3d_r]

@@ -5,6 +5,8 @@
 #include <memory>
 #include <tuple>
 
+#include <fstream>
+
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
@@ -46,6 +48,9 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
 	{
 		const Task &task = *task_ptr;
 		std::string taskName = task.name;
+        //name of the app (prueba)
+        LOGINF("NAME OF APP IS {}"_format(taskName));
+
 
 		double inst = 0, cycl = 0, ipc = -1;
 

@@ -1,0 +1,14 @@
+# 3.5-full on Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz
+BE             Backend_Bound:                                      57.87 +-     0.00 % Slots  <==
+BE/Mem         Backend_Bound.Memory_Bound:                         26.65 +-     0.00 % Slots 
+BE/Core        Backend_Bound.Core_Bound:                           31.21 +-     0.00 % Slots 
+BE/Mem         Backend_Bound.Memory_Bound.L1_Bound:                10.46 +-     0.00 % Stalls
+	This metric estimates how often the CPU was stalled without
+	loads missing the L1 data cache...
+	Sampling events:  mem_load_uops_retired.l1_hit:pp mem_load_uops_retired.hit_lfb:pp
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization:         30.51 +-     0.00 % Clocks
+	This metric estimates fraction of cycles the CPU performance
+	was potentially limited due to Core computation issues (non
+	divider-related)...
+               MUX:                                                 3.99 +-     0.00 %       
+	PerfMon Event Multiplexing accuracy indicator

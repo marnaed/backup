@@ -161,7 +161,7 @@ void loop(
 			Task &task = *task_ptr;
 			// Get CPU of task
 			int cpu_id = get_cpu_id(task.pid);
-			LOGDEB("----> Task {} is in CPU {}"_format(task.pid,cpu_id));
+			LOGINF("----> Task {} is in CPU {}"_format(task.pid,cpu_id));
 			// Read stats
 			const counters_t counters = perf.read_counters(task.pid, catpol->get_cat())[0];
 			task.stats.accum(counters);

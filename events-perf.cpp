@@ -69,8 +69,10 @@ void Perf::clean(pid_t pid)
 
 void Perf::setup_events(pid_t pid, const std::vector<std::string> &groups)
 {
-	assert(pid >= 1);
-	for (const auto &events : groups)
+	LOGINF("Hola 1");
+    assert(pid >= 1);
+    LOGINF("Hola 2");
+    for (const auto &events : groups)
 	{
 		const auto evlist = ::setup_events(std::to_string(pid).c_str(), events.c_str());
 		if (evlist == NULL)

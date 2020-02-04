@@ -1,0 +1,18 @@
+# 3.5-full on Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz
+BE             Backend_Bound:                                                       53.66 +-     0.00 % Slots     
+BE/Mem         Backend_Bound.Memory_Bound:                                          23.13 +-     0.00 % Slots     
+BE/Core        Backend_Bound.Core_Bound:                                            30.53 +-     0.00 % Slots     
+BE/Mem         Backend_Bound.Memory_Bound.L1_Bound:                                 14.39 +-     0.00 % Stalls    
+	This metric estimates how often the CPU was stalled without
+	loads missing the L1 data cache...
+	Sampling events:  mem_load_uops_retired.l1_hit:pp mem_load_uops_retired.hit_lfb:pp
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization:                          32.48 +-     0.00 % Clocks    
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization.0_Ports_Utilized:         29.98 +-     0.00 % CoreClocks <==
+	This metric represents Core fraction of cycles CPU executed
+	no uops on any execution port...
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization.1_Port_Utilized:          24.81 +-     0.00 % CoreClocks
+	This metric represents Core fraction of cycles where the CPU
+	executed total of 1 uop per cycle on all execution ports...
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization.2_Ports_Utilized:         21.03 +-     0.00 % CoreClocks
+	This metric represents Core fraction of cycles CPU executed
+	total of 2 uops per cycle on all execution ports...

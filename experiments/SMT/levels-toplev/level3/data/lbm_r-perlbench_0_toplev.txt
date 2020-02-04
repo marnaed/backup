@@ -1,0 +1,12 @@
+# 3.5-full on Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz
+BE             Backend_Bound:                                      56.46 +-     0.00 % Slots  <==
+BE/Mem         Backend_Bound.Memory_Bound:                         26.09 +-     0.00 % Slots 
+	This metric represents fraction of slots the Memory
+	subsystem within the Backend was a bottleneck...
+BE/Core        Backend_Bound.Core_Bound:                           30.37 +-     0.00 % Slots 
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization:         38.44 +-     0.00 % Clocks
+	This metric estimates fraction of cycles the CPU performance
+	was potentially limited due to Core computation issues (non
+	divider-related)...
+               MUX:                                                 3.95 +-     0.00 %       
+	PerfMon Event Multiplexing accuracy indicator

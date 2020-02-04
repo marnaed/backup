@@ -1,0 +1,25 @@
+# 3.5-full on Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz
+BE             Backend_Bound:                                                       59.60 +-     0.00 % Slots            <==
+BE/Mem         Backend_Bound.Memory_Bound:                                          30.05 +-     0.00 % Slots           
+BE/Core        Backend_Bound.Core_Bound:                                            29.55 +-     0.00 % Slots           
+BE/Mem         Backend_Bound.Memory_Bound.L1_Bound:                                 16.17 +-     0.00 % Stalls          
+BE/Mem         Backend_Bound.Memory_Bound.L2_Bound:                                  5.07 +-     0.00 % Stalls          
+	This metric estimates how often the CPU was stalled due to
+	L2 cache accesses by loads...
+	Sampling events:  mem_load_uops_retired.l2_hit:pp
+BE/Mem         Backend_Bound.Memory_Bound.L1_Bound.DTLB_Load:                       27.63 +-     0.00 % Clocks_Estimated
+	This metric roughly estimates the fraction of cycles where
+	the TLB was missed by load accesses...
+	Sampling events:  mem_uops_retired.stlb_miss_loads:pp
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization:                          33.67 +-     0.00 % Clocks          
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization.0_Ports_Utilized:         31.95 +-     0.00 % CoreClocks      
+	This metric represents Core fraction of cycles CPU executed
+	no uops on any execution port...
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization.1_Port_Utilized:          30.20 +-     0.00 % CoreClocks      
+	This metric represents Core fraction of cycles where the CPU
+	executed total of 1 uop per cycle on all execution ports...
+BE/Core        Backend_Bound.Core_Bound.Ports_Utilization.2_Ports_Utilized:         22.01 +-     0.00 % CoreClocks      
+	This metric represents Core fraction of cycles CPU executed
+	total of 2 uops per cycle on all execution ports...
+               MUX:                                                                  2.43 +-     0.00 %                 
+	PerfMon Event Multiplexing accuracy indicator

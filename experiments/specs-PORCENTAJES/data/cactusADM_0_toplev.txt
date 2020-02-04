@@ -1,0 +1,11 @@
+# 3.5-full on Intel(R) Xeon(R) CPU E5-2620 v4 @ 2.10GHz
+FE             Frontend_Bound:          22.15 +-     0.00 % Slots
+	This category represents fraction of slots where the
+	processor's Frontend undersupplies its Backend...
+BAD            Bad_Speculation:         10.63 +-     0.00 % Slots
+	This category represents fraction of slots wasted due to
+	incorrect speculations...
+BE             Backend_Bound:           39.40 +-     0.00 % Slots <==
+	This category represents fraction of slots where no uops are
+	being delivered due to a lack of required resources for
+	accepting new uops in the Backend...
