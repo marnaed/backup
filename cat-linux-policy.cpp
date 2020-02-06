@@ -48,9 +48,27 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
 	{
 		const Task &task = *task_ptr;
 		std::string taskName = task.name;
-        //name of the app (prueba)
-        LOGINF("NAME OF APP IS {}"_format(taskName));
-
+        pid_t taskPID = task.pid;
+        // ini Prueba
+        LOGINF("NAME OF APP IS {} ->  PID {} "_format(taskName,taskPID));
+        double cpu_clk  = task.stats.last("cpu_clk_unhalted.thread");
+        double slots = cpu_clk * 4;
+        //LOGINF("CPU CLK  : {} "_format(cpu_clk));
+        double retired = task.stats.last("uops_retired.retire_slots");
+        //LOGINF("RETIRED  : {}"_format(retired));
+        double int_misc = task.stats.last("int_misc.recovery_cycles");
+        //LOGINF("INT MISC : {}"_format(int_misc));
+        double delivered = task.stats.last("idq_uops_not_delivered.core");
+        double issued_any = task.stats.last("UOPS_ISSUED.ANY");
+        double bad_speculation = (issued_any - retired + 4*int_misc) / slots;
+        double frontend_bound = (delivered /  slots) * 100;
+        double retiring = (retired / slots)*100 ;
+        double backend_bound = 100 - (frontend_bound + bad_speculation + retiring);
+        LOGINF("Retiring (%)        : {} "_format(retiring)); 
+        LOGINF("Frontend (%)        : {} "_format(frontend_bound));
+        LOGINF("Bad Speculation (%) : {} "_format(bad_speculation));
+        LOGINF("Backend Bound (%)   : {} "_format(backend_bound));
+        // fin Prueba
 
 		double inst = 0, cycl = 0, ipc = -1;
 
@@ -73,6 +91,7 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
 		ipc = inst / cycl;
         ipcTotal += ipc;
 	}
+    
 }
 
 
