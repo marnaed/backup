@@ -17,9 +17,7 @@
 #include "cat-linux-policy.hpp"
 #include "kmeans.hpp"
 #include "log.hpp"
-
 #include "common.hpp"
-#include "config.hpp"
 
 namespace cat
 {
@@ -44,7 +42,7 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
         return;
 
     double ipcTotal = 0;
-    auto v_apps = std::vector<pairD_t>();
+    auto v_ipc = std::vector<pairD_t>();
 
 
     LOGINF("CAT Policy name: NoPart");
@@ -55,8 +53,8 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
 		const Task &task = *task_ptr;
 		std::string taskName = task.name;
         double taskPID = task.pid;
-        //#############################################################
-        //LOGINF("-- {} --> PID {} "_format(taskName,taskPID));
+        // ini Prueba
+        LOGINF("APP {} --> PID {} "_format(taskName,taskPID));
         double cpu_clk  = task.stats.last("cpu_clk_unhalted.thread");
         double slots = cpu_clk * 4;
         double retired = task.stats.last("uops_retired.retire_slots");
@@ -76,7 +74,30 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
         
         //En que cpu esta la app
         uint64_t cpu = get_cpu_id(task.pid);
-        //LOGINF("Cpu -> {}  "_format(cpu));
+        LOGINF("Cpu -> {}  "_format(cpu));
+        //PRUEBA PARA CAMBIAR DE CPU DEPENDIENDO DE ALGUN FACTOR ( LA CPUE EN LA QUE ESTA)
+        cpu_set_t mask;
+        CPU_ZERO(&mask);
+        pid_t tpid = taskPID;
+        uint64_t ey = 2;
+        uint64_t pp = 9;
+        if(cpu == ey && cpu != pp){
+          set_cpu_affinity_V2(pp,tpid);  
+          LOGINF("Lo he cambiado a {}"_format(get_cpu_id(task.pid)));
+        }else if ( cpu == pp){
+          set_cpu_affinity_V2(ey,tpid);
+            LOGINF("Lo he cambiado a {}"_format(get_cpu_id(task.pid)));
+
+        }
+        //Calculo del ipc para guardarlo en el vector de tuplas
+        //Es provisional cuando vea que sera mejor poner como <clave,valor>
+        //double elipc = task.stats.last("ipc");
+        //LOGINF("ipc -> {}  "_format(elipc));
+        //v_ipc.push_back(std::make_pair(taskPID, elipc));
+                
+        //Para ver que tamanyo ha recogido ya
+        //LOGINF("NUMERO DE APPS --- {}"_format(v_ipc.size()));
+        
         //Calculo del tipo que predomina en este quantum
         double maximo1 = std::max(retiring,frontend_bound);
         double maximo2 = std::max(bad_speculation,backend_bound);
@@ -84,14 +105,26 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
         std::string type;
 
         //Guardar el tipo maximo 
-        if (maximo == retiring)            { type = "retiring";       }
-        else if (maximo == frontend_bound) { type = "frontend_bound"; }
-        else if (maximo == bad_speculation){ type = "bad_speculation";}
-        else if (maximo == backend_bound)  { type = "backend_bound";  }
-        //Push de los datos de la app
-        pid_t tpid = taskPID;
-        v_apps.push_back(std::make_tuple(tpid, type, cpu));
-               
+        if (maximo == retiring) { 
+            //LOGINF("RETIRING"); 
+            type = "retiring";
+        }
+        else if (maximo == frontend_bound) { 
+            LOGINF("FRONTEND BOUND"); 
+            type = "frontend_bound";
+        }
+        else if (maximo == bad_speculation) { 
+            LOGINF("BAD SPECULATION");
+            type = "bad_speculation";
+        }
+        else if(maximo == backend_bound) { 
+            LOGINF("BACKEND BOUND"); 
+            type = "backend_bound";
+        }
+        v_ipc.push_back(std::make_pair(taskPID, type));
+                      
+        // fin Prueba
+
 		double inst = 0, cycl = 0, ipc = -1;
 
         assert((stats == "total") | (stats == "interval"));
@@ -115,37 +148,18 @@ void NoPart::apply(uint64_t current_interval, const tasklist_t &tasklist)
 	}
     //Ya ha pasado por todas las apps que estamos ejecutando
     LOGINF("~~~~ TUPLAS ~~~~"); 
-    for (const auto &t : v_apps )
+    for (const auto &t : v_ipc )
     {
-        LOGINF("< {} , {} , {} > "_format(std::get<0>(t), std::get<1>(t), std::get<2>(t)));
+        LOGINF("< {} , {} > "_format(std::get<0>(t), std::get<1>(t)));
     }
     LOGINF("~ ~ ~ ~ ~ ~ ~ ~ ~");
     //Criterios para ordenar bien las apps dentro de los cores
-    //cosre fisico 0 ( 1-9 ) y core fisico 1 ( 2- 10)
-    for(const auto &t : v_apps){
-        //Datos de la tarea gestionada
-        pid_t pid_actual = std::get<0>(t);
-        std::string type_actual = std::get<1>(t);
-        //uint32_t cpu_actual = std::get<2>(t);
-        //Buscar conflictos con la app actual
-        //LOGINF("###### pid_actual -> {}"_format(pid_actual));
-        pid_t pid_cambia = busca_tipo_y_core(v_apps, pid_actual); 
-        //LOGINF("###### pid_actual -> {}"_format(pid_actual));
-        //LOGINF("###### pid_cambia -> {}"_format(pid_cambia));
-        //Si ha encontrado un conflicto con una app 
-        if(pid_cambia != -1){
-            //LOGINF("---EL PID QUE HAY QUE CAMBIAR ::: {} y soy {}"_format(pid_cambia,pid_actual));
-              cambia_core_valido(v_apps, pid_cambia);
-			
-			
-                                                                                                                                                                                                                                                                                            
-        }
 
 
-    }   
+
 
 }
-//##########################################################################################
+
 
 
 
@@ -161,7 +175,6 @@ void CriticalAware::reset_configuration(const tasklist_t &tasklist)
     	{
 			const Task &task = *task_ptr;
         	pid_t taskPID = task.pid;
-           
 			LinuxBase::get_cat()->add_task(1,taskPID);
 		}
 	}

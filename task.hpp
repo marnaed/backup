@@ -37,6 +37,7 @@ class Task
 	const bool batch;              // Batch tasks do not need to be completed in order to finish the execution
 
 	std::vector<uint32_t> cpus;    // Allowed cpus
+    //const uint32_t current_cpu;    //Current cpu  
 	std::string rundir = ""; // Set before executing the task
 	pid_t pid = 0;           // Set after executing the task
 

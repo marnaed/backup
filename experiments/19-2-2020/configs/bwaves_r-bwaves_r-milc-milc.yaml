@@ -539,8 +539,16 @@ cos:
 tasks:
   - app: *bwaves_r
     max_instr: *bwaves_r_mi
+    cpus: 1
+  - app: *bwaves_r
+    max_instr: *bwaves_r_mi
+    cpus: 9
   - app: *milc
     max_instr: *milc_mi
+    cpus: 2
+  - app: *milc
+    max_instr: *milc_mi
+    cpus: 10
 
 cat_policy:
     kind: np

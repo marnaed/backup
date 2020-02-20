@@ -3,6 +3,7 @@
 #include <glib.h>
 #include <fmt/format.h>
 #include <grp.h>
+#include "log.hpp"
 
 #include "common.hpp"
 #include "throw-with-trace.hpp"
@@ -167,6 +168,96 @@ void set_cpu_affinity(std::vector<uint32_t> cpus, pid_t pid)
 	if (sched_setaffinity(pid, sizeof(mask), &mask) < 0)
 		throw_with_trace(std::runtime_error("Could not set CPU affinity: " + std::string(strerror(errno))));
 }
+//#############################################################################################################
+//Cambia la app con el pid indicado al cpu indicado
+void set_cpu_affinity_V2(uint32_t cpu, pid_t pid)
+{
+        // All cpus allowed
+        //if (cpus.size() == 0)
+        //   return;
+
+        // Set CPU affinity
+         cpu_set_t mask;
+         CPU_ZERO(&mask);
+        // for (auto cpu : cpus)
+             CPU_SET(cpu, &mask);
+         if (sched_setaffinity(pid, sizeof(mask), &mask) < 0)
+             throw_with_trace(std::runtime_error("Could not set CPU affinity: " + std::string(strerror(errno))));
+}
+
+//Busca el pid de la app que este en el mismo core fisico y haya conflicto
+pid_t busca_tipo_y_core(std::vector<pairD_t> datos, pid_t pid_buscador)
+{
+    for(const auto &t : datos){
+
+        if(std::get<0>(t) == pid_buscador){
+            std::string type_actual = std::get<1>(t);
+            //LOGINF("SOY EL BUSCADOR {}"_format(std::get<0>(t)));
+            uint64_t cpu_actual = std::get<2>(t);
+            //Busca apps con el mismo tipo y que no sea la que esta buscando conflictos
+            for(const auto &y : datos)
+            {
+                /*
+                LOGINF("---------------------------------------------");
+                LOGINF("Type_Actual    :: {}"_format(type_actual));
+                LOGINF("STD::GET<1>(Y) :: {}"_format(std::get<1>(y)));
+                LOGINF("pid_buscador   :: {}"_format( pid_buscador));
+                LOGINF("STD::GET<0>(y) :: {}"_format(std::get<0>(y)));
+                LOGINF("---------------------------------------------");
+                */
+
+                //NO ES CONVENIENTE --> RET & RET || BB & BB , por ejemplo
+                if(((type_actual == std::get<1>(y)) && std::get<0>(y) != pid_buscador && std::get<0>(y) > pid_buscador) && (type_actual == "retiring" || type_actual == "backend_bound") ) 
+                {
+                    //Si son del mismo core fisico debe devolver el pid de la app con la que hay conflicto
+                    if( ((cpu_actual + 8) == std::get<2>(y)) || ((cpu_actual - 8) == std::get<2>(y)) )
+                    {
+                        pid_t a = std::get<0>(y); //App que crea conflicto
+                        LOGINF("CONFLICTO >>  {} con el buscador  {} "_format(a,pid_buscador));
+                        return a;
+                    }
+                }
+            }
+        }
+    }
+    //LOGINF("DEVUELVE -1");
+    return -1;
+}
+
+//Busca una app que tenga tambien conflicto e intercambiar los cores
+void cambia_core_valido(std::vector<pairD_t> datos, pid_t pid_cambia)
+{
+    uint32_t cpu_nuevo;
+    for (const auto &t : datos)
+    {
+         if(std::get<0>(t) == pid_cambia)
+        {
+            uint32_t cpu_actual = std::get<2>(t);
+            std::string type_actual = std::get<1>(t);
+            //Busca apps que no sean de su core fisico y sin problemas
+            for(const auto &y : datos )
+            {
+               //NO ES CONVENIENTE --> Del mismo tipo ( En este caso del mismo tipo )  
+                if( ((cpu_actual + 8) != std::get<2>(y)) && ((cpu_actual - 8) != std::get<2>(y)) && (std::get<0>(y) != pid_cambia))
+                {
+             
+                      //if( busca_tipo_y_core(datos, std::get<0>(y)) != -1 )
+                      //{
+                       
+                        cpu_nuevo = std::get<2>(y);
+                        //LOGINF("~~~~~ SI cambio");
+                        //HAY QUE PONER ALGO AQUI PARA QUE NO SE PUEDAN PONER JUNTOS DOS APPS EN EL MISMO CORE FISICO
+                        set_cpu_affinity_V2(cpu_nuevo, pid_cambia);
+                        set_cpu_affinity_V2(cpu_actual,std::get<0>(y));
+                        break; //Ya ha hecho el cambio de core
+                     //}
+                }
+            }
+        }
+    }//si no hace break antes , no se moverá de lugar y ya está
+}
+
+//############################################################################################################
 
 
 int get_self_cpu_id()

@@ -537,10 +537,18 @@ cos:
 
 
 tasks:
-  - app: *bwaves_r
-    max_instr: *bwaves_r_mi
-  - app: *milc
-    max_instr: *milc_mi
+  - app: *cam4_r
+    max_instr: *cam4_r_mi
+    cpus: 1
+  - app: *cam4_r
+    max_instr: *cam4_r_mi
+    cpus: 9
+  - app: *hmmer
+    max_instr: *hmmer_mi
+    cpus: 2
+  - app: *hmmer
+    max_instr: *hmmer_mi
+    cpus: 10
 
 cat_policy:
     kind: np

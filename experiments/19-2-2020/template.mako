@@ -2,7 +2,7 @@
 <%include file="instr_60s_500ms.mako"/>
 
 <%!
-lc = {0:1, 1:9, 2:2, 3:10, 4:3, 5:11, 6:4, 7:12}
+lc = {0:1, 1:9, 2:2, 3:10}
 %>
 
 cos:
@@ -16,7 +16,7 @@ tasks:
   % for app in apps:
   - app: *${app}
     max_instr: *${app}_mi
-  ##cpus: ${lc[loop.index]}
+    cpus: ${lc[loop.index]}
   % endfor
 
 cat_policy:

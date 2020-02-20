@@ -537,10 +537,18 @@ cos:
 
 
 tasks:
-  - app: *bwaves_r
-    max_instr: *bwaves_r_mi
-  - app: *milc
-    max_instr: *milc_mi
+  - app: *perlbench
+    max_instr: *perlbench_mi
+    cpus: 1
+  - app: *x264_r
+    max_instr: *x264_r_mi
+    cpus: 9
+  - app: *perlbench
+    max_instr: *perlbench_mi
+    cpus: 2
+  - app: *x264_r
+    max_instr: *x264_r_mi
+    cpus: 10
 
 cat_policy:
     kind: np

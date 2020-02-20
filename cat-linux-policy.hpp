@@ -52,13 +52,14 @@ class NoPart: public Base
 	std::shared_ptr<CAT> catLinux = std::make_shared<CATLinux>();
     uint64_t every = -1;
     std::string stats = "total";
-
+    typedef std::tuple<double, std::string, uint64_t > pairD_t;
 	double expected_IPC = 0;
 
     public:
     virtual ~NoPart() = default;
     NoPart(uint64_t _every, std::string _stats) : every(_every), stats(_stats){}
     virtual void apply(uint64_t, const tasklist_t &) override;
+    //void set_cpu_affinity(const auto  &task);
 };
 typedef NoPart NP;
 

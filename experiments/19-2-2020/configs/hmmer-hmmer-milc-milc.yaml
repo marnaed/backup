@@ -537,8 +537,12 @@ cos:
 
 
 tasks:
-  - app: *bwaves_r
-    max_instr: *bwaves_r_mi
+  - app: *hmmer
+    max_instr: *hmmer_mi
+  - app: *hmmer
+    max_instr: *hmmer_mi
+  - app: *milc
+    max_instr: *milc_mi
   - app: *milc
     max_instr: *milc_mi
 
